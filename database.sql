@@ -108,7 +108,23 @@ ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 -- Adicionar técnicos iniciais (password default: devafa)
 INSERT INTO users (username, password_hash, name)
 VALUES 
-('mg', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Miguel'),
-('jsilva', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'João Silva'),
-('amartins', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Ana Martins')
+('gno', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Guilherme Nóbrega'),
+('mgo', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Miguel Góis'),
+('rna', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Rúben Nascimento')
 ON CONFLICT (username) DO NOTHING;
+
+-- ─── Tabela MEETINGS ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS meetings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    date DATE NOT NULL,
+    duration_hours FLOAT DEFAULT 0,
+    technicians JSONB DEFAULT '[]'::jsonb,
+    attendees TEXT,
+    notes TEXT,
+    checklist JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE meetings DISABLE ROW LEVEL SECURITY;

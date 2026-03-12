@@ -345,5 +345,77 @@ def delete_task(id):
     supabase.table("tasks").delete().eq("id", id).execute()
     return '', 204
 
+# ─── MEETINGS ─────────────────────────────────────────────────────────────────
+
+@app.route('/api/meetings', methods=['GET'])
+def get_meetings():
+    try:
+        res = supabase.table("meetings").select("*, projects(name)").execute()
+        meetings = res.data
+
+        for m in meetings:
+            m["project_name"] = (m.pop("projects", None) or {}).get("name", "")
+
+        return jsonify(meetings)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/meetings', methods=['POST'])
+def create_meeting():
+    try:
+        data = request.json
+        payload = {
+            "title": data.get("title"),
+            "project_id": data.get("projectId") or None,
+            "date": data.get("date"),
+            "duration_hours": data.get("durationHours", 0),
+            "technicians": data.get("technicians", []),
+            "attendees": data.get("attendees", ""),
+            "notes": data.get("notes", ""),
+            "checklist": data.get("checklist", [])
+        }
+
+        res = supabase.table("meetings").insert(payload).execute()
+        new_meeting = res.data[0] if res.data else {}
+        new_meeting["project_name"] = ""
+
+        if new_meeting.get("project_id"):
+            proj_res = supabase.table("projects").select("name").eq("id", new_meeting["project_id"]).single().execute()
+            if proj_res.data:
+                new_meeting["project_name"] = proj_res.data["name"]
+
+        return jsonify(new_meeting), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/meetings/<id>', methods=['PUT'])
+def update_meeting(id):
+    try:
+        data = request.json
+        payload = {}
+        if "title" in data: payload["title"] = data["title"]
+        if "projectId" in data: payload["project_id"] = data["projectId"] or None
+        if "date" in data: payload["date"] = data["date"]
+        if "durationHours" in data: payload["duration_hours"] = data["durationHours"]
+        if "technicians" in data: payload["technicians"] = data["technicians"]
+        if "attendees" in data: payload["attendees"] = data["attendees"]
+        if "notes" in data: payload["notes"] = data["notes"]
+        if "checklist" in data: payload["checklist"] = data["checklist"]
+
+        res = supabase.table("meetings").update(payload).eq("id", id).execute()
+        if res.data:
+            return jsonify(res.data[0])
+        return jsonify({"error": "Meeting not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/meetings/<id>', methods=['DELETE'])
+def delete_meeting(id):
+    try:
+        supabase.table("meetings").delete().eq("id", id).execute()
+        return '', 204
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

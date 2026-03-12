@@ -27,6 +27,7 @@ import {
   ArrowRight,
   CalendarDays,
   X,
+  Users,
 } from "lucide-react"
 import {
   BarChart,
@@ -45,6 +46,7 @@ import {
 export function Dashboard() {
   const projects = useProjectStore((state) => state.projects)
   const tasks = useProjectStore((state) => state.tasks)
+  const meetings = useProjectStore((state) => state.meetings)
 
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: "",
@@ -53,10 +55,11 @@ export function Dashboard() {
 
   const hasDateFilter = dateRange.start || dateRange.end
 
-  // Filter projects and tasks based on date range
-  const { filteredProjects, filteredTasks } = useMemo(() => {
+  // Filter projects, tasks and meetings based on date range
+  const { filteredProjects, filteredTasks, filteredMeetings } = useMemo(() => {
     let filteredProjects = projects
     let filteredTasks = tasks
+    let filteredMeetings = meetings
 
     if (dateRange.start || dateRange.end) {
       const startDate = dateRange.start ? new Date(dateRange.start) : null
@@ -89,29 +92,59 @@ export function Dashboard() {
         }
         return true
       })
+
+      filteredMeetings = meetings.filter((m) => {
+        const meetingDate = new Date(m.date)
+        if (startDate && endDate) {
+          return meetingDate >= startDate && meetingDate <= endDate
+        } else if (startDate) {
+          return meetingDate >= startDate
+        } else if (endDate) {
+          return meetingDate <= endDate
+        }
+        return true
+      })
     }
 
-    return { filteredProjects, filteredTasks }
-  }, [projects, tasks, dateRange])
+    return { filteredProjects, filteredTasks, filteredMeetings }
+  }, [projects, tasks, meetings, dateRange])
 
   const stats = useMemo(() => {
     const totalProjects = filteredProjects.length
     const projectsInProgress = filteredProjects.filter((p) => p.status === "Em curso").length
     const totalTasks = filteredTasks.length
     const tasksCompleted = filteredTasks.filter((t) => t.status === "Concluído").length
-    const totalPlannedHours = filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0)
+    const totalMeetings = filteredMeetings.length
+    const totalMeetingHours = filteredMeetings.reduce((acc, m) => acc + m.durationHours, 0)
+    
+    // Recalcula as horas reais totais considerando tarefas + reuniões (para os projetos filtrados)
     const totalActualHours = filteredProjects.reduce((acc, p) => acc + p.actualHours, 0)
+    const totalPlannedHours = filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0)
 
     // Technician performance data
-    const techniciansMap: Record<string, { name: string; tasks: number; hours: number }> = {}
+    const techniciansMap: Record<string, { name: string; tasks: number; meetings: number; hours: number }> = {}
+    
+    // Altura de tarefas
     filteredTasks.forEach(task => {
       const tech = task.technician || "Sem Técnico"
       if (!techniciansMap[tech]) {
-        techniciansMap[tech] = { name: tech, tasks: 0, hours: 0 }
+        techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0 }
       }
       techniciansMap[tech].tasks += 1
       techniciansMap[tech].hours += (task.actualHours || 0)
     })
+
+    // Altura de reuniões
+    filteredMeetings.forEach(meeting => {
+      meeting.technicians.forEach(tech => {
+        if (!techniciansMap[tech]) {
+          techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0 }
+        }
+        techniciansMap[tech].meetings += 1
+        techniciansMap[tech].hours += meeting.durationHours
+      })
+    })
+
     const techData = Object.values(techniciansMap).sort((a, b) => b.hours - a.hours)
 
     // Task status distribution
@@ -126,12 +159,14 @@ export function Dashboard() {
       projectsInProgress, 
       totalTasks, 
       tasksCompleted, 
+      totalMeetings,
+      totalMeetingHours,
       totalPlannedHours, 
       totalActualHours,
       techData,
       statusData
     }
-  }, [filteredProjects, filteredTasks])
+  }, [filteredProjects, filteredTasks, filteredMeetings])
 
   const recentProjects = filteredProjects.slice(0, 5)
   const activeTasks = filteredTasks.filter((t) => t.status !== "Concluído").slice(0, 5)
@@ -257,32 +292,29 @@ export function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Horas Realizadas
+              Horas Reais
             </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalActualHours}h</div>
+            <div className="text-2xl font-bold">{stats.totalActualHours.toFixed(1)}h</div>
             <p className="text-xs text-muted-foreground">
-              de {stats.totalPlannedHours}h previstas
+              {stats.totalMeetingHours.toFixed(1)}h em reuniões
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Taxa de Conclusão
+              Reuniões Realizadas
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.totalTasks > 0
-                ? Math.round((stats.tasksCompleted / stats.totalTasks) * 100)
-                : 0}
-              %
-            </div>
-            <p className="text-xs text-muted-foreground">tarefas concluídas</p>
+            <div className="text-2xl font-bold">{stats.totalMeetings}</div>
+            <p className="text-xs text-muted-foreground">
+              neste período
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -359,11 +391,13 @@ export function Dashboard() {
                 <div key={tech.name} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
                   <div>
                     <p className="font-medium">{tech.name}</p>
-                    <p className="text-xs text-muted-foreground">{tech.tasks} tarefas atribuídas</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tech.tasks} tarefas | {tech.meetings} reuniões
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-lg">{tech.hours}h</p>
-                    <p className="text-xs text-muted-foreground">total horas reais</p>
+                    <p className="font-bold text-lg">{tech.hours.toFixed(1)}h</p>
+                    <p className="text-xs text-muted-foreground">total acumulado</p>
                   </div>
                 </div>
               ))}

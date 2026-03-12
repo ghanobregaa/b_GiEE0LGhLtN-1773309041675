@@ -10,6 +10,8 @@ import {
   type PhaseType,
   type Company,
   type User,
+  type Meeting,
+  type MeetingChecklistItem,
 } from "./data"
 
 import { getApiUrl } from "./api-config"
@@ -72,6 +74,19 @@ const mapTask = (t: any): Task => ({
   actualHours: t.actual_hours != null ? Number(t.actual_hours) : undefined,
 })
 
+const mapMeeting = (m: any): Meeting => ({
+  id: String(m.id),
+  title: m.title,
+  projectId: m.project_id ? String(m.project_id) : undefined,
+  projectName: m.project_name || "",
+  date: m.date,
+  durationHours: Number(m.duration_hours || 0),
+  technicians: m.technicians || [],
+  attendees: m.attendees || "",
+  notes: m.notes || "",
+  checklist: m.checklist || [],
+})
+
 // ─── HELPERS: camelCase (Frontend) → snake_case (API) ─────────────────────────
 
 const phaseToApi = (p: Partial<Phase>) => ({
@@ -116,12 +131,24 @@ const taskToApi = (t: Partial<Task & { projectId?: string }>) => ({
   ...(t.status !== undefined && { status: t.status }),
 })
 
+const meetingToApi = (m: Partial<Meeting>) => ({
+  ...(m.title !== undefined && { title: m.title }),
+  ...(m.projectId !== undefined && { projectId: m.projectId }),
+  ...(m.date !== undefined && { date: m.date }),
+  ...(m.durationHours !== undefined && { durationHours: m.durationHours }),
+  ...(m.technicians !== undefined && { technicians: m.technicians }),
+  ...(m.attendees !== undefined && { attendees: m.attendees }),
+  ...(m.notes !== undefined && { notes: m.notes }),
+  ...(m.checklist !== undefined && { checklist: m.checklist }),
+})
+
 // ─── STORE ────────────────────────────────────────────────────────────────────
 
 interface ProjectStore {
   projects: Project[]
   tasks: Task[]
   users: User[]
+  meetings: Meeting[]
   isLoading: boolean
   error: string | null
 
@@ -146,6 +173,11 @@ interface ProjectStore {
   deleteTask: (id: string) => Promise<void>
   getTasksByProjectId: (projectId: string) => Task[]
 
+  // Meeting actions
+  addMeeting: (meeting: Omit<Meeting, "id" | "projectName">) => Promise<string>
+  updateMeeting: (id: string, updates: Partial<Meeting>) => Promise<void>
+  deleteMeeting: (id: string) => Promise<void>
+
   recalculateProjectHours: (projectId: string) => Promise<void>
   recalculatePhaseHours: (phaseId: string) => Promise<void>
 }
@@ -154,6 +186,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   projects: [],
   tasks: [],
   users: [],
+  meetings: [],
   isLoading: false,
   error: null,
 
@@ -162,38 +195,47 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   fetchData: async () => {
     set({ isLoading: true, error: null })
     try {
-      const [projectsRes, tasksRes, usersRes] = await Promise.all([
+      const [projectsRes, tasksRes, usersRes, meetingsRes] = await Promise.all([
         fetch(`${API_URL}/projects`),
         fetch(`${API_URL}/tasks`),
         fetch(`${API_URL}/users`),
+        fetch(`${API_URL}/meetings`),
       ])
 
-      if (!projectsRes.ok || !tasksRes.ok || !usersRes.ok) {
+      if (!projectsRes.ok || !tasksRes.ok || !usersRes.ok || !meetingsRes.ok) {
         throw new Error("Erro ao carregar dados do servidor")
       }
 
       const rawProjects = await projectsRes.json()
       const rawTasks = await tasksRes.json()
       const rawUsers = await usersRes.json()
+      const rawMeetings = await meetingsRes.json()
 
       const mappedTasks: Task[] = rawTasks.map(mapTask)
       const mappedProjects: Project[] = rawProjects.map(mapProject)
       const mappedUsers: User[] = rawUsers.map(mapUser)
+      const mappedMeetings: Meeting[] = rawMeetings.map(mapMeeting)
 
-      // Recalcula as horas reais de cada projecto com base nas suas tarefas
+      // Recalcula as horas reais de cada projecto com base nas suas tarefas e reuniões
       const projectsWithHours = mappedProjects.map((p) => {
         const projectTasks = mappedTasks.filter((t) => t.projectId === p.id)
         const totalActualHours = projectTasks.reduce(
           (sum, t) => sum + (Number(t.actualHours) || 0),
           0
         )
-        return { ...p, actualHours: totalActualHours }
+        const projectMeetings = mappedMeetings.filter((m) => m.projectId === p.id)
+        const totalMeetingHours = projectMeetings.reduce(
+          (sum, m) => sum + (Number(m.durationHours) || 0),
+          0
+        )
+        return { ...p, actualHours: totalActualHours + totalMeetingHours }
       })
 
       set({
         projects: projectsWithHours,
         tasks: mappedTasks,
         users: mappedUsers,
+        meetings: mappedMeetings,
         isLoading: false,
       })
     } catch (err: any) {
@@ -436,15 +478,84 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     return get().tasks.filter((t) => t.projectId === projectId)
   },
 
+  // ─── MEETINGS ─────────────────────────────────────────────────────────────
+
+  addMeeting: async (meetingData) => {
+    const res = await fetch(`${API_URL}/meetings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(meetingToApi(meetingData)),
+    })
+    if (!res.ok) throw new Error("Erro ao criar reunião")
+    const newRaw = await res.json()
+    const newMeeting = mapMeeting(newRaw)
+
+    set((state) => ({ meetings: [...state.meetings, newMeeting] }))
+    if (meetingData.projectId) {
+      await get().recalculateProjectHours(meetingData.projectId)
+    }
+    return newMeeting.id
+  },
+
+  updateMeeting: async (id, updates) => {
+    const meeting = get().meetings.find((m) => m.id === id)
+    if (!meeting) return
+
+    await fetch(`${API_URL}/meetings/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(meetingToApi(updates)),
+    })
+
+    let projectName = meeting.projectName
+    if (updates.projectId && updates.projectId !== meeting.projectId) {
+      const newProject = get().projects.find((p) => p.id === updates.projectId)
+      projectName = newProject?.name || ""
+    }
+
+    set((state) => ({
+      meetings: state.meetings.map((m) =>
+        m.id === id ? { ...m, ...updates, projectName } : m
+      ),
+    }))
+
+    if (meeting.projectId) await get().recalculateProjectHours(meeting.projectId)
+    if (updates.projectId && updates.projectId !== meeting.projectId) {
+      await get().recalculateProjectHours(updates.projectId)
+    }
+  },
+
+  deleteMeeting: async (id) => {
+    const meeting = get().meetings.find((m) => m.id === id)
+    if (!meeting) return
+
+    await fetch(`${API_URL}/meetings/${id}`, { method: "DELETE" })
+    set((state) => ({ meetings: state.meetings.filter((m) => m.id !== id) }))
+    
+    if (meeting.projectId) {
+      await get().recalculateProjectHours(meeting.projectId)
+    }
+  },
+
+  // ─── UTILS ────────────────────────────────────────────────────────────────
+
   recalculateProjectHours: async (projectId) => {
     const project = get().projects.find(p => p.id === projectId)
     if (!project) return
 
     const tasks = get().tasks.filter((t) => t.projectId === projectId)
-    const totalActualHours = tasks.reduce(
+    const taskActualHours = tasks.reduce(
       (sum, t) => sum + (Number(t.actualHours) || 0),
       0
     )
+
+    const meetings = get().meetings.filter((m) => m.projectId === projectId)
+    const meetingActualHours = meetings.reduce(
+      (sum, m) => sum + (Number(m.durationHours) || 0),
+      0
+    )
+
+    const totalActualHours = taskActualHours + meetingActualHours
 
     // Lógica de datas baseada nas fases
     let actualStartDate: string | undefined = undefined
@@ -558,7 +669,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 }))
 
 // Re-export types and helper functions
-export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User }
+export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User, Meeting, MeetingChecklistItem }
 export {
   formatDate,
   getStatusColor,

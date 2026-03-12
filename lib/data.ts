@@ -9,6 +9,25 @@ export interface User {
   createdAt: string
 }
 
+export interface MeetingChecklistItem {
+  id: string
+  text: string
+  checked: boolean
+}
+
+export interface Meeting {
+  id: string
+  title: string
+  projectId?: string
+  projectName?: string
+  date: string
+  durationHours: number
+  technicians: string[]
+  attendees: string
+  notes: string
+  checklist: MeetingChecklistItem[]
+}
+
 export interface Phase {
   id: string
   type: PhaseType
