@@ -1,0 +1,305 @@
+"use client"
+
+import { useMemo } from "react"
+import Link from "next/link"
+import { type Project, getPhaseColor } from "@/lib/store"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+interface GanttChartProps {
+  projects: Project[]
+}
+
+// Returns start of month (day 1, 00:00:00)
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+// Returns end of month (last day, 23:59:59)
+function endOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0)
+}
+
+export function GanttChart({ projects }: GanttChartProps) {
+  const today = useMemo(() => new Date(), [])
+
+  // Fixed window: previous month → next month
+  const { startDate, endDate, totalDays, months, todayOffset } = useMemo(() => {
+    const prevMonth  = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const nextMonthEnd = endOfMonth(new Date(today.getFullYear(), today.getMonth() + 1, 1))
+
+    const startDate = startOfMonth(prevMonth)      // 1st of previous month
+    const endDate   = nextMonthEnd                  // last day of next month
+
+    const totalDays = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1
+
+    // Build 3-month header
+    const months: { label: string; startOffset: number; days: number }[] = []
+    for (let m = -1; m <= 1; m++) {
+      const ms = new Date(today.getFullYear(), today.getMonth() + m, 1)
+      const me = endOfMonth(ms)
+      const startOffset = Math.round(
+        (ms.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      )
+      const days = Math.round(
+        (me.getTime() - ms.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1
+
+      months.push({
+        label: ms.toLocaleDateString("pt-PT", { month: "long", year: "numeric" }),
+        startOffset,
+        days,
+      })
+    }
+
+    // Today's offset from start
+    const todayOffset = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+
+    return { startDate, endDate, totalDays, months, todayOffset }
+  }, [today])
+
+  // Returns left/width % for a bar, clamped to the visible window
+  const getBarPosition = (startStr: string, endStr: string) => {
+    const s = new Date(startStr)
+    const e = new Date(endStr)
+
+    // Clamp to window
+    const clampedStart = s < startDate ? startDate : s
+    const clampedEnd   = e > endDate   ? endDate   : e
+
+    if (clampedStart > endDate || clampedEnd < startDate) {
+      return null // completely outside visible window
+    }
+
+    const startOffset = Math.round(
+      (clampedStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    )
+    const duration = Math.round(
+      (clampedEnd.getTime() - clampedStart.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1
+
+    return {
+      left:  `${(startOffset / totalDays) * 100}%`,
+      width: `${Math.max((duration / totalDays) * 100, 0.5)}%`,
+    }
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[800px]">
+
+        {/* ── Month Header ─────────────────────────────────────────── */}
+        <div className="flex border-b border-border mb-1">
+          <div className="w-52 shrink-0 px-2 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Projeto / Fase
+          </div>
+          <div className="flex-1 relative h-8">
+            {months.map((month, idx) => (
+              <div
+                key={idx}
+                className={`absolute top-0 h-full flex items-center pl-2 text-xs font-semibold border-l ${
+                  idx === 1
+                    ? "text-primary border-primary/40 bg-primary/5"
+                    : "text-muted-foreground border-border"
+                }`}
+                style={{
+                  left:  `${(month.startOffset / totalDays) * 100}%`,
+                  width: `${(month.days / totalDays) * 100}%`,
+                }}
+              >
+                {month.label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Project Rows ─────────────────────────────────────────── */}
+        <TooltipProvider>
+          <div className="relative">
+
+            {/* Today line — container mirroring row layout to ensure chart area alignment */}
+            <div className="absolute inset-0 flex pointer-events-none z-20">
+              <div className="w-52 shrink-0" />
+              <div className="flex-1 relative">
+                <div
+                  className="absolute top-0 bottom-0"
+                  style={{ left: `${(todayOffset / totalDays) * 100}%` }}
+                >
+                  {/* Red vertical line */}
+                  <div className="absolute inset-y-0 w-[2px] bg-red-500/80" />
+                  {/* Top label */}
+                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-red-500 whitespace-nowrap bg-background border border-red-200 px-1.5 py-0.5 rounded shadow-sm">
+                    Hoje
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {projects.map((project) => {
+              const projectBar = getBarPosition(
+                project.plannedStartDate,
+                project.plannedEndDate
+              )
+
+              return (
+                <div key={project.id} className="mb-3">
+                  {/* Project Row */}
+                  <div className="flex items-center hover:bg-muted/30 rounded h-8">
+                    <div className="w-52 shrink-0 px-2">
+                      <Link
+                        href={`/projetos/${project.id}`}
+                        className="font-semibold text-sm hover:text-primary hover:underline truncate block"
+                      >
+                        {project.name}
+                      </Link>
+                    </div>
+                    <div className="flex-1 relative h-6">
+                      {/* Month background bands */}
+                      {months.map((m, i) => (
+                        <div
+                          key={i}
+                          className={`absolute inset-y-0 ${i === 1 ? "bg-primary/5" : ""}`}
+                          style={{
+                            left:  `${(m.startOffset / totalDays) * 100}%`,
+                            width: `${(m.days / totalDays) * 100}%`,
+                          }}
+                        />
+                      ))}
+
+                      {/* Project span bar */}
+                      {projectBar && (
+                        <div
+                          className="absolute h-full rounded-md bg-indigo-200/60 border border-indigo-300/50"
+                          style={projectBar}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Phase Rows */}
+                  {project.phases.map((phase) => {
+                    const plannedBar = getBarPosition(
+                      phase.plannedStartDate,
+                      phase.plannedEndDate
+                    )
+                    const actualBar = phase.actualStartDate
+                      ? getBarPosition(
+                          phase.actualStartDate,
+                          phase.actualEndDate || new Date().toISOString().split("T")[0]
+                        )
+                      : null
+
+                    return (
+                      <div
+                        key={phase.id}
+                        className="flex items-center hover:bg-muted/20 rounded h-7"
+                      >
+                        <div className="w-52 shrink-0 px-2 pl-7">
+                          <span className="text-xs text-muted-foreground truncate block">
+                            {phase.name}
+                          </span>
+                        </div>
+                        <div className="flex-1 relative h-5">
+                          {/* Month bands */}
+                          {months.map((m, i) => (
+                            <div
+                              key={i}
+                              className={`absolute inset-y-0 ${i === 1 ? "bg-primary/5" : ""}`}
+                              style={{
+                                left:  `${(m.startOffset / totalDays) * 100}%`,
+                                width: `${(m.days / totalDays) * 100}%`,
+                              }}
+                            />
+                          ))}
+
+                          {/* Planned bar */}
+                          {plannedBar && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`absolute h-3 top-1 rounded-sm cursor-pointer opacity-80 hover:opacity-100 transition-opacity ${getPhaseColor(phase.type)}`}
+                                  style={plannedBar}
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <div className="text-xs space-y-0.5">
+                                  <p className="font-semibold">{phase.name}</p>
+                                  <p className="text-muted-foreground">{phase.type}</p>
+                                  <p>Previsto: {phase.plannedHours}h</p>
+                                  <p>
+                                    {new Date(phase.plannedStartDate).toLocaleDateString("pt-PT")}
+                                    {" → "}
+                                    {new Date(phase.plannedEndDate).toLocaleDateString("pt-PT")}
+                                  </p>
+                                  {phase.actualStartDate && (
+                                    <p className="border-t pt-0.5 mt-0.5">
+                                      Real: {phase.actualHours || 0}h
+                                    </p>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Actual bar */}
+                          {actualBar && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`absolute h-1.5 top-[14px] rounded-sm cursor-pointer ${getPhaseColor(phase.type)} ring-1 ring-white/80`}
+                                  style={actualBar}
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="text-xs">
+                                  <p className="font-semibold">{phase.name} — Real</p>
+                                  <p>Horas realizadas: {phase.actualHours || 0}h</p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        </TooltipProvider>
+
+        {/* ── Legend ───────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center gap-5 mt-6 pt-4 border-t border-border">
+          <span className="text-xs text-muted-foreground font-semibold">Legenda:</span>
+          <LegendItem color="bg-sky-500"     label="Requisitos" />
+          <LegendItem color="bg-amber-500"   label="Desenvolvimento" />
+          <LegendItem color="bg-emerald-500" label="Testes" />
+          <LegendItem color="bg-violet-500"  label="Documentação" />
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+            <div className="w-px h-4 bg-red-500" />
+            <span className="text-xs text-muted-foreground">Hoje</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-3 rounded-sm bg-indigo-200/60 border border-indigo-300/50" />
+            <span className="text-xs text-muted-foreground">Duração do projeto</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`w-4 h-3 rounded-sm ${color}`} />
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  )
+}
