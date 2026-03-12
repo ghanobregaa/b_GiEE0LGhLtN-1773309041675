@@ -25,11 +25,22 @@ import {
   Clock,
   TrendingUp,
   ArrowRight,
-  CheckCircle2,
-  AlertCircle,
   CalendarDays,
   X,
 } from "lucide-react"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts"
 
 export function Dashboard() {
   const projects = useProjectStore((state) => state.projects)
@@ -83,14 +94,44 @@ export function Dashboard() {
     return { filteredProjects, filteredTasks }
   }, [projects, tasks, dateRange])
 
-  const stats = {
-    totalProjects: filteredProjects.length,
-    projectsInProgress: filteredProjects.filter((p) => p.status === "Em curso").length,
-    totalTasks: filteredTasks.length,
-    tasksCompleted: filteredTasks.filter((t) => t.status === "Concluído").length,
-    totalPlannedHours: filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0),
-    totalActualHours: filteredProjects.reduce((acc, p) => acc + p.actualHours, 0),
-  }
+  const stats = useMemo(() => {
+    const totalProjects = filteredProjects.length
+    const projectsInProgress = filteredProjects.filter((p) => p.status === "Em curso").length
+    const totalTasks = filteredTasks.length
+    const tasksCompleted = filteredTasks.filter((t) => t.status === "Concluído").length
+    const totalPlannedHours = filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0)
+    const totalActualHours = filteredProjects.reduce((acc, p) => acc + p.actualHours, 0)
+
+    // Technician performance data
+    const techniciansMap: Record<string, { name: string; tasks: number; hours: number }> = {}
+    filteredTasks.forEach(task => {
+      const tech = task.technician || "Sem Técnico"
+      if (!techniciansMap[tech]) {
+        techniciansMap[tech] = { name: tech, tasks: 0, hours: 0 }
+      }
+      techniciansMap[tech].tasks += 1
+      techniciansMap[tech].hours += (task.actualHours || 0)
+    })
+    const techData = Object.values(techniciansMap).sort((a, b) => b.hours - a.hours)
+
+    // Task status distribution
+    const statusData = [
+      { name: "Pendente", value: filteredTasks.filter(t => t.status === "Pendente").length, color: "#94a3b8" },
+      { name: "Em Curso", value: filteredTasks.filter(t => t.status === "Em curso").length, color: "#f59e0b" },
+      { name: "Concluído", value: filteredTasks.filter(t => t.status === "Concluído").length, color: "#10b981" },
+    ].filter(s => s.value > 0)
+
+    return { 
+      totalProjects, 
+      projectsInProgress, 
+      totalTasks, 
+      tasksCompleted, 
+      totalPlannedHours, 
+      totalActualHours,
+      techData,
+      statusData
+    }
+  }, [filteredProjects, filteredTasks])
 
   const recentProjects = filteredProjects.slice(0, 5)
   const activeTasks = filteredTasks.filter((t) => t.status !== "Concluído").slice(0, 5)
@@ -104,9 +145,9 @@ export function Dashboard() {
       {/* Welcome Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Bem-vindo de volta</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Painel de Controlo (KPIs)</h2>
           <p className="text-muted-foreground">
-            Aqui está um resumo dos seus projetos e tarefas.
+            Acompanhamento em tempo real de técnicos, tarefas e horas.
           </p>
         </div>
 
@@ -183,26 +224,6 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Date Filter Active Indicator */}
-      {hasDateFilter && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-          <CalendarDays className="h-4 w-4" />
-          <span>
-            Período:{" "}
-            {dateRange.start ? formatDate(dateRange.start) : "Início"} até{" "}
-            {dateRange.end ? formatDate(dateRange.end) : "Fim"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 ml-auto"
-            onClick={clearDateFilter}
-          >
-            Limpar
-          </Button>
-        </div>
-      )}
-
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -241,9 +262,9 @@ export function Dashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalActualHours}</div>
+            <div className="text-2xl font-bold">{stats.totalActualHours}h</div>
             <p className="text-xs text-muted-foreground">
-              de {stats.totalPlannedHours} previstas
+              de {stats.totalPlannedHours}h previstas
             </p>
           </CardContent>
         </Card>
@@ -266,12 +287,97 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Projects and Tasks */}
+      {/* KPI Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Projects */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Horas por Técnico</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.techData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}h`} />
+                <Tooltip 
+                  cursor={{fill: 'hsl(var(--muted)/0.5)'}}
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Bar dataKey="hours" name="Horas Reais" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Estado das Tarefas</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stats.statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {stats.statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Performance Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Desempenho de Equipa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stats.techData.map((tech) => (
+                <div key={tech.name} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
+                  <div>
+                    <p className="font-medium">{tech.name}</p>
+                    <p className="text-xs text-muted-foreground">{tech.tasks} tarefas atribuídas</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-lg">{tech.hours}h</p>
+                    <p className="text-xs text-muted-foreground">total horas reais</p>
+                  </div>
+                </div>
+              ))}
+              {stats.techData.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">Sem dados de técnicos disponíveis.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Project Progress Overview */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Projetos Recentes</CardTitle>
+            <CardTitle>Progresso dos Projetos</CardTitle>
             <Link href="/projetos">
               <Button variant="ghost" size="sm" className="gap-1">
                 Ver todos
@@ -281,146 +387,37 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentProjects.length > 0 ? (
-                recentProjects.map((project) => {
+              {filteredProjects.length > 0 ? (
+                filteredProjects.map((project) => {
                   const progress = calculateProjectProgress(project)
                   return (
-                    <Link
-                      key={project.id}
-                      href={`/projetos/${project.id}`}
-                      className="block"
-                    >
-                      <div className="flex items-center gap-4 rounded-lg border p-3 hover:bg-muted/50 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">
-                              {project.name}
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className={`${getStatusColor(project.status)} shrink-0`}
-                            >
-                              {project.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {project.owner}
-                          </p>
-                        </div>
-                        <div className="w-24 shrink-0">
-                          <Progress value={progress} className="h-2" />
-                          <span className="text-xs text-muted-foreground">
-                            {progress}%
-                          </span>
-                        </div>
+                    <div key={project.id} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <Link
+                          href={`/projetos/${project.id}`}
+                          className="font-medium hover:text-primary hover:underline truncate max-w-[200px]"
+                        >
+                          {project.name}
+                        </Link>
+                        <span className="font-medium">{progress}%</span>
                       </div>
-                    </Link>
+                      <Progress value={progress} className="h-2" />
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>{project.company}</span>
+                        <span>{project.actualHours}/{project.plannedHours}h</span>
+                      </div>
+                    </div>
                   )
                 })
               ) : (
                 <p className="text-center text-muted-foreground py-4">
-                  Nenhum projeto encontrado no período selecionado.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Tasks */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Tarefas Ativas</CardTitle>
-            <Link href="/tarefas">
-              <Button variant="ghost" size="sm" className="gap-1">
-                Ver todas
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {activeTasks.length > 0 ? (
-                activeTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-start gap-3 rounded-lg border p-3"
-                  >
-                    {task.status === "Em curso" ? (
-                      <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <CheckCircle2 className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{task.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {task.projectName} - {task.technician}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          Prazo: {formatDate(task.plannedEndDate)}
-                        </span>
-                        <Badge
-                          variant="secondary"
-                          className={getStatusColor(task.status)}
-                        >
-                          {task.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-4">
-                  {hasDateFilter
-                    ? "Nenhuma tarefa ativa no período selecionado."
-                    : "Todas as tarefas estão concluídas!"}
+                  Nenhum projeto encontrado.
                 </p>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Project Progress Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Progresso dos Projetos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredProjects.length > 0 ? (
-              filteredProjects.map((project) => {
-                const progress = calculateProjectProgress(project)
-                return (
-                  <div key={project.id} className="flex items-center gap-4">
-                    <div className="w-48 shrink-0">
-                      <Link
-                        href={`/projetos/${project.id}`}
-                        className="font-medium hover:text-primary hover:underline"
-                      >
-                        {project.name}
-                      </Link>
-                    </div>
-                    <div className="flex-1">
-                      <Progress value={progress} className="h-3" />
-                    </div>
-                    <div className="w-20 text-right text-sm">
-                      <span className="font-medium">{progress}%</span>
-                    </div>
-                    <div className="w-24 text-right text-sm text-muted-foreground">
-                      {project.actualHours}/{project.plannedHours}h
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <p className="text-center text-muted-foreground py-4">
-                Nenhum projeto encontrado no período selecionado.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
   type TaskStatus,
   type PhaseType,
   type Company,
+  type User,
 } from "./data"
 
 import { getApiUrl } from "./api-config"
@@ -16,6 +17,13 @@ import { getApiUrl } from "./api-config"
 const API_URL = getApiUrl()
 
 // ─── MAPPERS: snake_case (DB) → camelCase (Frontend) ──────────────────────────
+
+const mapUser = (u: any): User => ({
+  id: String(u.id),
+  username: u.username,
+  name: u.name,
+  createdAt: u.created_at,
+})
 
 const mapPhase = (ph: any): Phase => ({
   id: String(ph.id),
@@ -113,11 +121,13 @@ const taskToApi = (t: Partial<Task & { projectId?: string }>) => ({
 interface ProjectStore {
   projects: Project[]
   tasks: Task[]
+  users: User[]
   isLoading: boolean
   error: string | null
 
   // Data fetching
   fetchData: () => Promise<void>
+  fetchUsers: () => Promise<void>
 
   // Project actions
   addProject: (project: Omit<Project, "id" | "actualHours">) => Promise<string>
@@ -143,6 +153,7 @@ interface ProjectStore {
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   projects: [],
   tasks: [],
+  users: [],
   isLoading: false,
   error: null,
 
@@ -151,20 +162,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   fetchData: async () => {
     set({ isLoading: true, error: null })
     try {
-      const [projectsRes, tasksRes] = await Promise.all([
+      const [projectsRes, tasksRes, usersRes] = await Promise.all([
         fetch(`${API_URL}/projects`),
         fetch(`${API_URL}/tasks`),
+        fetch(`${API_URL}/users`),
       ])
 
-      if (!projectsRes.ok || !tasksRes.ok) {
+      if (!projectsRes.ok || !tasksRes.ok || !usersRes.ok) {
         throw new Error("Erro ao carregar dados do servidor")
       }
 
       const rawProjects = await projectsRes.json()
       const rawTasks = await tasksRes.json()
+      const rawUsers = await usersRes.json()
 
       const mappedTasks: Task[] = rawTasks.map(mapTask)
       const mappedProjects: Project[] = rawProjects.map(mapProject)
+      const mappedUsers: User[] = rawUsers.map(mapUser)
 
       // Recalcula as horas reais de cada projecto com base nas suas tarefas
       const projectsWithHours = mappedProjects.map((p) => {
@@ -179,11 +193,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       set({
         projects: projectsWithHours,
         tasks: mappedTasks,
+        users: mappedUsers,
         isLoading: false,
       })
     } catch (err: any) {
       set({ error: err.message, isLoading: false })
     }
+  },
+
+  fetchUsers: async () => {
+    try {
+      const res = await fetch(`${API_URL}/users`)
+      if (res.ok) {
+        const raw = await res.json()
+        set({ users: raw.map(mapUser) })
+      }
+    } catch (err) {}
   },
 
   // ─── PROJECTS ─────────────────────────────────────────────────────────────
@@ -533,7 +558,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 }))
 
 // Re-export types and helper functions
-export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company }
+export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User }
 export {
   formatDate,
   getStatusColor,

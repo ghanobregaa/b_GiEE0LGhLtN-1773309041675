@@ -40,7 +40,10 @@ import {
   Pencil,
   Trash2,
   Eye,
+  Download,
+  FileDown,
 } from "lucide-react"
+import { getApiUrl } from "@/lib/api-config"
 
 export function ProjectsList() {
   const projects = useProjectStore((state) => state.projects)
@@ -49,6 +52,28 @@ export function ProjectsList() {
   const [selectedCompany, setSelectedCompany] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportExcel = async () => {
+    setIsExporting(true)
+    try {
+      const response = await fetch(`${getApiUrl()}/projects/export/excel`)
+      if (!response.ok) throw new Error("Erro ao exportar ficheiro")
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `projetos_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const filteredProjects = projects.filter((p) => {
     const statusMatch = selectedStatus === "all" || p.status === selectedStatus
@@ -93,10 +118,17 @@ export function ProjectsList() {
             Gerencie e acompanhe todos os seus projetos
           </p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Projeto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportExcel} disabled={isExporting}>
+            <FileDown className="h-4 w-4 mr-2" />
+            {isExporting ? "A exportar..." : "Exportar Excel"}
+          </Button>
+          <div className="w-[1px] h-8 bg-border mx-2" />
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Projeto
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

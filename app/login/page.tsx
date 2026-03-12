@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Lock, Loader2 } from "lucide-react"
+import { Lock, Loader2, User as UserIcon } from "lucide-react"
 import { getApiUrl } from "@/lib/api-config"
 
 export default function LoginPage() {
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -27,7 +28,7 @@ export default function LoginPage() {
       const res = await fetch(`${getApiUrl()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       })
 
       const data = await res.json()
@@ -66,7 +67,25 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            {/* Password input only */}
+            
+            {/* Username input */}
+            <div className="space-y-2">
+              <Label htmlFor="username">Utilizador</Label>
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Seu utilizador"
+                  className="pl-9"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Password input */}
             <div className="space-y-2">
               <Label htmlFor="password">Palavra-passe</Label>
               <div className="relative">
@@ -74,6 +93,7 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type="password"
+                  placeholder="••••••••"
                   className="pl-9"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

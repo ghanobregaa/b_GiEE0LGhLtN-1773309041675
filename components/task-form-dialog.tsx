@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 
+import { useAuthStore } from "@/lib/auth-store"
+
 interface TaskFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -31,15 +33,17 @@ interface TaskFormDialogProps {
 
 export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId }: TaskFormDialogProps) {
   const projects = useProjectStore((state) => state.projects)
+  const users = useProjectStore((state) => state.users)
   const addTask = useProjectStore((state) => state.addTask)
   const updateTask = useProjectStore((state) => state.updateTask)
+  const currentUser = useAuthStore((state) => state.user)
 
   const [formData, setFormData] = useState({
     projectId: defaultProjectId || "",
     phaseId: "",
     name: "",
     ticket: "",
-    technician: "",
+    technician: currentUser?.name || "",
     requester: "",
     plannedStartDate: "",
     plannedEndDate: "",
@@ -231,13 +235,21 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
 
             <div className="space-y-2">
               <Label htmlFor="technician">Técnico</Label>
-              <Input
-                id="technician"
+              <Select
                 value={formData.technician}
-                onChange={(e) => setFormData({ ...formData, technician: e.target.value })}
-                placeholder="Ex: MG"
-                required
-              />
+                onValueChange={(value) => setFormData({ ...formData, technician: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um técnico" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.name}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

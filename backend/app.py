@@ -3,7 +3,10 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+import pandas as pd
+import io
+from flask import send_file
 
 load_dotenv()
 
@@ -25,18 +28,19 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def login():
     try:
         data = request.json
+        username = data.get("username")
         password = data.get("password")
 
-        if not password:
-            return jsonify({"error": "A palavra-passe é obrigatória"}), 400
+        if not username or not password:
+            return jsonify({"error": "Utilizador e palavra-passe são obrigatórios"}), 400
 
-        # Procura o utilizador de sistema (username fixo 'admin')
-        res = supabase.table("users").select("*").eq("username", "admin").execute()
+        # Procura o utilizador pelo username
+        res = supabase.table("users").select("*").eq("username", username).execute()
         user = res.data[0] if res.data else None
 
         if not user or not check_password_hash(user["password_hash"], password):
-            print("Login falhou: Password incorreta")
-            return jsonify({"error": "Palavra-passe incorreta"}), 401
+            print(f"Login falhou para: {username}")
+            return jsonify({"error": "Credenciais incorretas"}), 401
 
         # Login sucesso
         print(f"Login efetuado com sucesso: {user['username']}")
@@ -47,7 +51,6 @@ def login():
         }), 200
     except Exception as e:
         print(f"ERRO NO LOGIN: {str(e)}")
-        # Se o erro indicar que a tabela não existe, daremos uma pista clara
         error_msg = str(e)
         if "relation \"users\" does not exist" in error_msg:
             error_msg = "A tabela 'users' não existe na base de dados. Por favor, execute o script SQL atualizado no Supabase."
@@ -147,6 +150,53 @@ def delete_project(id):
     # As fases e tarefas são eliminadas em cascata via ON DELETE CASCADE
     supabase.table("projects").delete().eq("id", id).execute()
     return '', 204
+
+@app.route('/api/projects/export/excel', methods=['GET'])
+def export_projects_excel():
+    try:
+        # Busca projetos e tarefas
+        proj_res = supabase.table("projects").select("*").execute()
+        task_res = supabase.table("tasks").select("*, projects(name)").execute()
+        
+        projects = proj_res.data
+        tasks = task_res.data
+        
+        # Prepara dados para o Excel
+        project_data = []
+        for p in projects:
+            p_tasks = [t for t in tasks if t["project_id"] == p["id"]]
+            actual_hours = sum(t.get("actual_hours", 0) or 0 for t in p_tasks)
+            
+            project_data.append({
+                "Projeto": p["name"],
+                "Empresa": p["company"],
+                "Estado": p["status"],
+                "Responsável": p["owner"],
+                "Início Previsto": p["planned_start_date"],
+                "Fim Previsto": p["planned_end_date"],
+                "Horas Previstas": p["planned_hours"],
+                "Horas Reais": actual_hours,
+                "Progresso": f"{round((actual_hours / p['planned_hours'] * 100)) if p['planned_hours'] > 0 else 0}%"
+            })
+            
+        df = pd.DataFrame(project_data)
+        
+        # Cria o Excel em memória
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Projetos')
+            
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='projetos_afa.xlsx'
+        )
+    except Exception as e:
+        print(f"Erro na exportação: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # ─── PHASES ───────────────────────────────────────────────────────────────────
 
@@ -253,6 +303,55 @@ def update_task(id):
 def delete_task(id):
     supabase.table("tasks").delete().eq("id", id).execute()
     return '', 204
+
+# ─── USERS MANAGEMENT ─────────────────────────────────────────────────────────
+
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    try:
+        res = supabase.table("users").select("id, username, name, created_at").execute()
+        return jsonify(res.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    try:
+        data = request.json
+        username = data.get("username")
+        password = data.get("password")
+        name = data.get("name")
+
+        if not username or not password:
+            return jsonify({"error": "Faltam campos obrigatórios"}), 400
+
+        payload = {
+            "username": username,
+            "name": name or username,
+            "password_hash": generate_password_hash(password)
+        }
+
+        res = supabase.table("users").insert(payload).execute()
+        if res.data:
+            user = res.data[0]
+            del user["password_hash"]
+            return jsonify(user), 201
+        return jsonify({"error": "Não foi possível criar o utilizador"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users/<id>', methods=['DELETE'])
+def delete_user(id):
+    try:
+        # Não permite apagar o admin original
+        user_res = supabase.table("users").select("username").eq("id", id).single().execute()
+        if user_res.data and user_res.data["username"] == "admin":
+            return jsonify({"error": "Não é possível apagar o utilizador administrador"}), 403
+
+        supabase.table("users").delete().eq("id", id).execute()
+        return '', 204
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

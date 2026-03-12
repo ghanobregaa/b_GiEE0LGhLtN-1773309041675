@@ -1,9 +1,11 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
+import io
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+import pandas as pd
 
 load_dotenv()
 
@@ -19,7 +21,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ─── AUTH ─────────────────────────────────────────────────────────────────────
+# ─── AUTH & USERS ─────────────────────────────────────────────────────────────
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -39,7 +41,6 @@ def login():
             return jsonify({"error": "Palavra-passe incorreta"}), 401
 
         # Login sucesso
-        print(f"Login efetuado com sucesso: {user['username']}")
         return jsonify({
             "id": user["id"],
             "username": user["username"],
@@ -47,11 +48,70 @@ def login():
         }), 200
     except Exception as e:
         print(f"ERRO NO LOGIN: {str(e)}")
-        # Se o erro indicar que a tabela não existe, daremos uma pista clara
         error_msg = str(e)
         if "relation \"users\" does not exist" in error_msg:
             error_msg = "A tabela 'users' não existe na base de dados. Por favor, execute o script SQL atualizado no Supabase."
         return jsonify({"error": error_msg}), 500
+
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    res = supabase.table("users").select("id, username, name, created_at").execute()
+    return jsonify(res.data)
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    try:
+        data = request.json
+        username = data.get("username")
+        password = data.get("password")
+        name = data.get("name")
+
+        if not username or not password:
+            return jsonify({"error": "Username e password são obrigatórios"}), 400
+
+        payload = {
+            "username": username,
+            "password_hash": generate_password_hash(password),
+            "name": name
+        }
+
+        res = supabase.table("users").insert(payload).execute()
+        return jsonify(res.data[0]), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users/<id>', methods=['DELETE'])
+def delete_user(id):
+    supabase.table("users").delete().eq("id", id).execute()
+    return '', 204
+
+# ─── EXPORT ───────────────────────────────────────────────────────────────────
+
+@app.route('/api/projects/export/excel', methods=['GET'])
+def export_excel():
+    try:
+        # Busca projetos
+        res = supabase.table("projects").select("*").execute()
+        df = pd.DataFrame(res.data)
+        
+        if df.empty:
+            return jsonify({"error": "Sem dados para exportar"}), 400
+
+        # Formatação básica
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Projetos')
+        
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='projetos_export.xlsx'
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
