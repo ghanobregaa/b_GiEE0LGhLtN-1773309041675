@@ -346,7 +346,7 @@ function ProjectRow({ project, onEdit, onDelete, isVisitor }: ProjectRowProps) {
           >
             {project.name}
           </Link>
-          <span className="text-[10px] text-muted-foreground line-clamp-1">{project.description}</span>
+          <span className="text-[10px] text-muted-foreground truncate max-w-[300px]">{project.description}</span>
         </div>
       </TableCell>
       <TableCell>

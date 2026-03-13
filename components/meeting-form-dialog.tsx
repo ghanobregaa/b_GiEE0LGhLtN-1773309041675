@@ -194,7 +194,7 @@ export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectI
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[65vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{meeting ? "Editar Reunião" : "Nova Reunião"}</DialogTitle>
           <DialogDescription>

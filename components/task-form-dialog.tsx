@@ -148,7 +148,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-5xl w-[65vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editTask ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle>
           <DialogDescription>
