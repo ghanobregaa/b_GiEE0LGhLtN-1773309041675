@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2, UserPlus, RefreshCw } from "lucide-react"
+import { Trash2, UserPlus, RefreshCw, Pencil, X } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuthStore } from "@/lib/auth-store"
 
 import { Badge } from "@/components/ui/badge"
 import {
@@ -23,6 +24,7 @@ import { type User, type UserRole } from "@/lib/data"
 export default function ConfiguracaoPage() {
   const users = useProjectStore((state) => state.users)
   const fetchUsers = useProjectStore((state) => state.fetchUsers)
+  const { user: currentUser, login: updateAuth } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +41,8 @@ export default function ConfiguracaoPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
+    setError(null)
     try {
       const res = await fetch(`${getApiUrl()}/users`, {
         method: "POST",
@@ -51,18 +55,25 @@ export default function ConfiguracaoPage() {
           role: newRole
         }),
       })
-      if (!res.ok) throw new Error("Erro ao criar utilizador")
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "Erro ao criar utilizador")
+      }
       
       resetForm()
       fetchUsers()
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingUser) return
+    setLoading(true)
+    setError(null)
     try {
       const res = await fetch(`${getApiUrl()}/users/${editingUser.id}`, {
         method: "PUT",
@@ -75,12 +86,28 @@ export default function ConfiguracaoPage() {
           ...(newPassword ? { password: newPassword } : {})
         }),
       })
-      if (!res.ok) throw new Error("Erro ao atualizar utilizador")
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "Erro ao atualizar utilizador")
+      }
       
+      // Se estivermos a editar o utilizador actual, actualizamos o AuthStore também
+      if (editingUser.id === currentUser?.id) {
+        updateAuth({
+          ...currentUser,
+          username: newUsername,
+          name: newName,
+          color: newColor,
+          role: newRole
+        })
+      }
+
       resetForm()
       fetchUsers()
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -107,11 +134,14 @@ export default function ConfiguracaoPage() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Tem a certeza que deseja eliminar este utilizador?")) return
     try {
+      setLoading(true)
       const res = await fetch(`${getApiUrl()}/users/${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Erro ao eliminar utilizador")
       fetchUsers()
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -199,11 +229,19 @@ export default function ConfiguracaoPage() {
 
               <div className="flex gap-2 pt-2">
                 {editingUser && (
-                  <Button type="button" variant="outline" className="flex-1" onClick={resetForm}>
+                  <Button type="button" variant="outline" className="flex-1" onClick={resetForm} disabled={loading}>
+                    <X className="h-4 w-4 mr-2" />
                     Cancelar
                   </Button>
                 )}
-                <Button type="submit" className="flex-[2]">
+                <Button type="submit" className="flex-[2]" disabled={loading}>
+                  {loading ? (
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  ) : editingUser ? (
+                    <Pencil className="h-4 w-4 mr-2" />
+                  ) : (
+                    <UserPlus className="h-4 w-4 mr-2" />
+                  )}
                   {editingUser ? "Atualizar Utilizador" : "Criar Utilizador"}
                 </Button>
               </div>
@@ -264,8 +302,9 @@ export default function ConfiguracaoPage() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => startEdit(user)}
+                          title="Editar"
                         >
-                          <RefreshCw className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"

@@ -48,6 +48,7 @@ def login():
             "id": user["id"],
             "username": user["username"],
             "name": user["name"],
+            "color": user.get("color", "#6366f1"),
             "role": user.get("role", "técnico")
         }), 200
     except Exception as e:
@@ -458,4 +459,4 @@ def delete_user(id):
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)

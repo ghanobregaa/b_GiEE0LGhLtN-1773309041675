@@ -72,8 +72,11 @@ export function AppSidebar() {
 
       <div className="p-4 border-t border-border mt-auto">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="h-4 w-4 text-primary" />
+          <div
+            className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+            style={{ backgroundColor: user?.color || "var(--primary)" }}
+          >
+            {user?.name?.charAt(0) || user?.username?.charAt(0) || <User className="h-4 w-4" />}
           </div>
           <div className="flex flex-col truncate">
             <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ interface User {
   id: string
   username: string
   name: string
+  color?: string
   role?: string
 }
 
