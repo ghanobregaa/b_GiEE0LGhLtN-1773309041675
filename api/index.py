@@ -1,11 +1,12 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import io
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from werkzeug.security import check_password_hash, generate_password_hash
 import pandas as pd
+import io
+from flask import send_file
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ─── AUTH & USERS ─────────────────────────────────────────────────────────────
+# ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -46,7 +47,9 @@ def login():
         return jsonify({
             "id": user["id"],
             "username": user["username"],
-            "name": user["name"]
+            "name": user["name"],
+            "color": user.get("color", "#6366f1"),
+            "role": user.get("role", "técnico")
         }), 200
     except Exception as e:
         print(f"ERRO NO LOGIN: {str(e)}")
@@ -55,47 +58,106 @@ def login():
             error_msg = "A tabela 'users' não existe na base de dados. Por favor, execute o script SQL atualizado no Supabase."
         return jsonify({"error": error_msg}), 500
 
-@app.route('/api/users', methods=['GET'])
-def get_users():
-    res = supabase.table("users").select("id, username, name, created_at").execute()
-    return jsonify(res.data)
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
-@app.route('/api/users', methods=['POST'])
-def create_user():
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+def to_snake(data: dict) -> dict:
+    """Converte campos camelCase do frontend para snake_case da BD."""
+    mapping = {
+        "plannedStartDate": "planned_start_date",
+        "plannedEndDate":   "planned_end_date",
+        "plannedHours":     "planned_hours",
+        "actualStartDate":  "actual_start_date",
+        "actualEndDate":    "actual_end_date",
+        "actualHours":      "actual_hours",
+        "projectId":        "project_id",
+        "phaseId":          "phase_id",
+        "company":          "company",
+        "startTime":        "start_time",
+        "durationHours":    "duration_hours",
+        "duration_hours":   "duration_hours",
+        "technicianId":     "technician_id",
+        "technician_id":    "technician_id",
+    }
+    result = {}
+    for k, v in data.items():
+        snake_key = mapping.get(k, k)
+        result[snake_key] = v
+    return result
+
+# ─── PROJECTS ─────────────────────────────────────────────────────────────────
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    # Busca todos os projetos
+    res = supabase.table("projects").select("*").execute()
+    projects = res.data
+
+    # Para cada projeto, busca as suas fases
+    for p in projects:
+        phases_res = supabase.table("phases").select("*").eq("project_id", p["id"]).order("planned_start_date").execute()
+        p["phases"] = phases_res.data
+
+    return jsonify(projects)
+
+@app.route('/api/projects', methods=['POST'])
+def create_project():
     try:
         data = request.json
-        username = data.get("username")
-        password = data.get("password")
-        name = data.get("name")
+        payload = to_snake(data)
+        
+        # Defaults
+        if "status" not in payload: payload["status"] = "Novo"
+        if "company" not in payload: payload["company"] = "SAVOY"
+        if "planned_hours" not in payload: payload["planned_hours"] = 0
+        
+        # Ensure UUID fields are not empty strings
+        for field in ["owner"]: # owner is text but just in case
+            if field in payload and not payload[field]:
+                payload[field] = None
 
-        if not username or not password:
-            return jsonify({"error": "Username e password são obrigatórios"}), 400
-
-        payload = {
-            "username": username,
-            "password_hash": generate_password_hash(password),
-            "name": name
-        }
-
-        res = supabase.table("users").insert(payload).execute()
-        return jsonify(res.data[0]), 201
+        res = supabase.table("projects").insert(payload).execute()
+        new_project = res.data[0] if res.data else {}
+        new_project["phases"] = []
+        return jsonify(new_project), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.route('/api/users/<id>', methods=['DELETE'])
-def delete_user(id):
+@app.route('/api/projects/<id>', methods=['GET'])
+def get_project(id):
+    res = supabase.table("projects").select("*").eq("id", id).single().execute()
+    project = res.data
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+
+    phases_res = supabase.table("phases").select("*").eq("project_id", id).order("planned_start_date").execute()
+    project["phases"] = phases_res.data
+    return jsonify(project)
+
+@app.route('/api/projects/<id>', methods=['PUT'])
+def update_project(id):
     try:
-        # Não permite apagar o admin original
-        user_res = supabase.table("users").select("username").eq("id", id).single().execute()
-        if user_res.data and user_res.data["username"] == "admin":
-            return jsonify({"error": "Não é possível apagar o utilizador administrador"}), 403
+        data = request.json
+        payload = to_snake(data)
+        # Remove campos que não devem ser actualizados directamente
+        payload.pop("id", None)
+        payload.pop("phases", None)
 
-        supabase.table("users").delete().eq("id", id).execute()
-        return '', 204
+        res = supabase.table("projects").update(payload).eq("id", id).execute()
+        if res.data:
+            return jsonify(res.data[0])
+        return jsonify({"error": "Project not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-# ─── EXPORT ───────────────────────────────────────────────────────────────────
+@app.route('/api/projects/<id>', methods=['DELETE'])
+def delete_project(id):
+    # As fases e tarefas são eliminadas em cascata via ON DELETE CASCADE
+    supabase.table("projects").delete().eq("id", id).execute()
+    return '', 204
 
 @app.route('/api/projects/export/excel', methods=['GET'])
 def export_projects_excel():
@@ -144,116 +206,21 @@ def export_projects_excel():
         print(f"Erro na exportação: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy"}), 200
-
-# ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-def to_snake(data: dict) -> dict:
-    """Converte campos camelCase do frontend para snake_case da BD."""
-    mapping = {
-        "plannedStartDate": "planned_start_date",
-        "plannedEndDate":   "planned_end_date",
-        "plannedHours":     "planned_hours",
-        "actualStartDate":  "actual_start_date",
-        "actualEndDate":    "actual_end_date",
-        "actualHours":      "actual_hours",
-        "projectId":        "project_id",
-        "phaseId":          "phase_id",
-        "company":          "company",
-    }
-    result = {}
-    for k, v in data.items():
-        snake_key = mapping.get(k, k)
-        result[snake_key] = v
-    return result
-
-# ─── PROJECTS ─────────────────────────────────────────────────────────────────
-
-@app.route('/api/projects', methods=['GET'])
-def get_projects():
-    # Busca todos os projetos
-    res = supabase.table("projects").select("*").execute()
-    projects = res.data
-
-    # Para cada projeto, busca as suas fases
-    for p in projects:
-        phases_res = supabase.table("phases").select("*").eq("project_id", p["id"]).order("planned_start_date").execute()
-        p["phases"] = phases_res.data
-
-    return jsonify(projects)
-
-@app.route('/api/projects', methods=['POST'])
-def create_project():
-    try:
-        data = request.json
-        payload = to_snake({
-            "name":             data.get("name"),
-            "description":      data.get("description"),
-            "owner":            data.get("owner"),
-            "status":           data.get("status", "Novo"),
-            "plannedStartDate": data.get("plannedStartDate"),
-            "plannedEndDate":   data.get("plannedEndDate"),
-            "plannedHours":     data.get("plannedHours", 0),
-            "company":          data.get("company", "SAVOY"),
-        })
-
-        res = supabase.table("projects").insert(payload).execute()
-        new_project = res.data[0] if res.data else {}
-        new_project["phases"] = []
-        return jsonify(new_project), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route('/api/projects/<id>', methods=['GET'])
-def get_project(id):
-    res = supabase.table("projects").select("*").eq("id", id).single().execute()
-    project = res.data
-    if not project:
-        return jsonify({"error": "Project not found"}), 404
-
-    phases_res = supabase.table("phases").select("*").eq("project_id", id).order("planned_start_date").execute()
-    project["phases"] = phases_res.data
-    return jsonify(project)
-
-@app.route('/api/projects/<id>', methods=['PUT'])
-def update_project(id):
-    try:
-        data = request.json
-        payload = to_snake(data)
-        # Remove campos que não devem ser actualizados directamente
-        payload.pop("id", None)
-        payload.pop("phases", None)
-
-        res = supabase.table("projects").update(payload).eq("id", id).execute()
-        if res.data:
-            return jsonify(res.data[0])
-        return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route('/api/projects/<id>', methods=['DELETE'])
-def delete_project(id):
-    # As fases e tarefas são eliminadas em cascata via ON DELETE CASCADE
-    supabase.table("projects").delete().eq("id", id).execute()
-    return '', 204
-
 # ─── PHASES ───────────────────────────────────────────────────────────────────
 
 @app.route('/api/projects/<project_id>/phases', methods=['POST'])
 def create_phase(project_id):
     try:
         data = request.json
-        payload = to_snake({
-            "project_id":       project_id,
-            "type":             data.get("type"),
-            "name":             data.get("name"),
-            "technician":       data.get("technician"),
-            "plannedStartDate": data.get("plannedStartDate"),
-            "plannedEndDate":   data.get("plannedEndDate"),
-            "plannedHours":     data.get("plannedHours", 0),
-        })
+        payload = to_snake(data)
+        payload["project_id"] = project_id
+        
+        if "planned_hours" not in payload: payload["planned_hours"] = 0
+        
+        # Ensure UUID fields are not empty strings
+        for field in ["project_id", "technician_id"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("phases").insert(payload).execute()
         return jsonify(res.data[0] if res.data else {}), 201
@@ -297,21 +264,14 @@ def get_tasks():
 def create_task():
     try:
         data = request.json
-        payload = to_snake({
-            "projectId":        data.get("projectId"),
-            "name":             data.get("name"),
-            "ticket":           data.get("ticket"),
-            "technician":       data.get("technician"),
-            "requester":        data.get("requester"),
-            "plannedStartDate": data.get("plannedStartDate"),
-            "plannedEndDate":   data.get("plannedEndDate"),
-            "plannedHours":     data.get("plannedHours", 0),
-            "actualStartDate":  data.get("actualStartDate"),
-            "actualEndDate":    data.get("actualEndDate"),
-            "actualHours":      data.get("actualHours"),
-            "status":           data.get("status", "Pendente"),
-            "phaseId":          data.get("phaseId"),
-        })
+        payload = to_snake(data)
+        if "status" not in payload: payload["status"] = "Pendente"
+        if "planned_hours" not in payload: payload["planned_hours"] = 0
+
+        # Ensure UUID fields are not empty strings
+        for field in ["project_id", "phase_id", "technician_id"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("tasks").insert(payload).execute()
         new_task = res.data[0] if res.data else {}
@@ -364,49 +324,51 @@ def get_meetings():
 def create_meeting():
     try:
         data = request.json
-        payload = {
-            "title": data.get("title"),
-            "project_id": data.get("projectId") or None,
-            "date": data.get("date"),
-            "duration_hours": data.get("durationHours", 0),
-            "technicians": data.get("technicians", []),
-            "attendees": data.get("attendees", ""),
-            "notes": data.get("notes", ""),
-            "checklist": data.get("checklist", [])
-        }
-
+        payload = to_snake(data)
+        
+        # Garante o project_id como None se for vazio
+        if "project_id" in payload and not payload["project_id"]:
+            payload["project_id"] = None
+            
         res = supabase.table("meetings").insert(payload).execute()
-        new_meeting = res.data[0] if res.data else {}
+        
+        if not res.data:
+            return jsonify({"error": "Não foi possível criar a reunião"}), 400
+            
+        new_meeting = res.data[0]
         new_meeting["project_name"] = ""
 
         if new_meeting.get("project_id"):
             proj_res = supabase.table("projects").select("name").eq("id", new_meeting["project_id"]).single().execute()
             if proj_res.data:
-                new_meeting["project_name"] = proj_res.data["name"]
+                new_meeting["project_name"] = proj_res.data.get("name", "")
 
         return jsonify(new_meeting), 201
     except Exception as e:
+        print(f"ERRO CREATE MEETING: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/meetings/<id>', methods=['PUT'])
 def update_meeting(id):
     try:
         data = request.json
-        payload = {}
-        if "title" in data: payload["title"] = data["title"]
-        if "projectId" in data: payload["project_id"] = data["projectId"] or None
-        if "date" in data: payload["date"] = data["date"]
-        if "durationHours" in data: payload["duration_hours"] = data["durationHours"]
-        if "technicians" in data: payload["technicians"] = data["technicians"]
-        if "attendees" in data: payload["attendees"] = data["attendees"]
-        if "notes" in data: payload["notes"] = data["notes"]
-        if "checklist" in data: payload["checklist"] = data["checklist"]
+        payload = to_snake(data)
+        
+        # Remove campos que não devem ser atualizados
+        payload.pop("id", None)
+        payload.pop("project_name", None)
+        
+        if "project_id" in payload and not payload["project_id"]:
+            payload["project_id"] = None
 
         res = supabase.table("meetings").update(payload).eq("id", id).execute()
-        if res.data:
-            return jsonify(res.data[0])
-        return jsonify({"error": "Meeting not found"}), 404
+        
+        if not res.data:
+            return jsonify({"error": "Reunião não encontrada ou erro na atualização"}), 404
+            
+        return jsonify(res.data[0])
     except Exception as e:
+        print(f"ERRO UPDATE MEETING: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/meetings/<id>', methods=['DELETE'])
@@ -417,5 +379,88 @@ def delete_meeting(id):
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+# ─── USERS MANAGEMENT ─────────────────────────────────────────────────────────
+
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    try:
+        res = supabase.table("users").select("id, username, name, color, role, created_at").execute()
+        return jsonify(res.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    try:
+        data = request.json
+        username = data.get("username")
+        password = data.get("password")
+        name = data.get("name")
+        color = data.get("color", "#6366f1")
+        
+        if not username or not password:
+            return jsonify({"error": "Faltam campos obrigatórios"}), 400
+
+        payload = {
+            "username": username,
+            "name": name or username,
+            "password_hash": generate_password_hash(password),
+            "color": color,
+            "role": data.get("role", "técnico")
+        }
+        
+        print(f"DEBUG: Creating user with payload: {payload}")
+        res = supabase.table("users").insert(payload).execute()
+        print(f"DEBUG: Supabase response: {res.data}")
+        if res.data:
+            user = res.data[0]
+            del user["password_hash"]
+            return jsonify(user), 201
+        return jsonify({"error": "Não foi possível criar o utilizador"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users/<id>', methods=['PUT'])
+def update_user(id):
+    try:
+        data = request.json
+        payload = {}
+        if "name" in data: payload["name"] = data["name"]
+        if "username" in data: payload["username"] = data["username"]
+        if "color" in data: payload["color"] = data["color"]
+        if "role" in data: payload["role"] = data["role"]
+        
+        # Se password for enviada, atualiza também
+        if "password" in data and data["password"]:
+            payload["password_hash"] = generate_password_hash(data["password"])
+
+        print(f"DEBUG: Updating user {id} with payload: {payload}")
+        res = supabase.table("users").update(payload).eq("id", id).execute()
+        print(f"DEBUG: Supabase response for update: {res.data}")
+        
+        if res.data:
+            user = res.data[0]
+            if "password_hash" in user: del user["password_hash"]
+            return jsonify(user)
+        return jsonify({"error": "Utilizador não encontrado"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users/<id>', methods=['DELETE'])
+def delete_user(id):
+    try:
+        # Não permite apagar o admin original
+        user_res = supabase.table("users").select("username").eq("id", id).single().execute()
+        if user_res.data and user_res.data["username"] == "admin":
+            return jsonify({"error": "Não é possível apagar o utilizador administrador"}), 403
+
+        supabase.table("users").delete().eq("id", id).execute()
+        return '', 204
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+# Vercel needs the app variable
+app = app
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)
