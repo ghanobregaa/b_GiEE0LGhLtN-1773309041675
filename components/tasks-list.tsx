@@ -78,7 +78,7 @@ export function TasksList() {
       const matchesSearch =
         task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.technician.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (users.find(u => u.id === task.technicianId)?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.requester.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesStatus = statusFilter === "all" || task.status === statusFilter
@@ -485,10 +485,11 @@ export function TasksList() {
                               {task.ticket || "-"}
                             </TableCell>
                             <TableCell>
-                              {task.technician && (
+                              {task.technicianId && (
                                 <div className="flex items-center gap-1.5">
                                   {(() => {
-                                    const user = users.find(u => u.name === task.technician);
+                                    const user = users.find(u => u.id === task.technicianId);
+                                    const techName = user?.name || task.technicianId;
                                     return (
                                       <Badge 
                                         variant="outline" 
@@ -499,7 +500,7 @@ export function TasksList() {
                                           color: user?.color
                                         }}
                                       >
-                                        {task.technician}
+                                        {techName}
                                       </Badge>
                                     );
                                   })()}

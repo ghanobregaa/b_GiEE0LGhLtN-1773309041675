@@ -462,16 +462,23 @@ export function Dashboard() {
               {stats.techData.map((tech) => (
                 <div key={tech.name} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
                   <div className="flex items-center gap-3">
-                    <div 
-                      className="w-2 h-8 rounded-full" 
-                      style={{ backgroundColor: tech.color || "#ccc" }}
-                    />
+                    {(() => {
+                      const color = tech.color || "#6366f1";
+                      return (
+                        <div 
+                          className="w-1.5 h-8 rounded-full" 
+                          style={{ backgroundColor: color }}
+                        />
+                      );
+                    })()}
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{tech.name}</p>
-                        <Badge variant="outline" className="text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50 h-4 px-1">
-                          DEV
-                        </Badge>
+                        {tech.name !== "Sem Técnico" && (
+                          <Badge variant="outline" className="text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50 h-4 px-1">
+                            DEV
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {tech.tasks} tarefas | {tech.meetings} reuniões

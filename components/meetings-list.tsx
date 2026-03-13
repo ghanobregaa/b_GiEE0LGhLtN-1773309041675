@@ -213,11 +213,11 @@ export function MeetingsList() {
                           return (
                             <div
                               key={i}
-                              className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[10px] font-medium text-white"
-                              style={{ backgroundColor: user?.color || "#ccc" }}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[10px] font-medium text-white shadow-sm"
+                              style={{ backgroundColor: user?.color || "#6366f1" }}
                               title={displayName}
                             >
-                              {displayName.charAt(0)}
+                              {displayName.charAt(0).toUpperCase()}
                             </div>
                           );
                         })}

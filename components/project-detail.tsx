@@ -407,16 +407,19 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                       <TableCell>
                         {(() => {
                           const user = users.find(u => u.id === task.technicianId);
+                          const techName = user?.name || task.technicianId || "Sem Técnico";
                           return (
-                            <div className="flex items-center gap-2">
-                              {user?.color && (
-                                <div
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: user.color }}
-                                />
-                              )}
-                              <span>{user?.name || task.technicianId || "Sem Técnico"}</span>
-                            </div>
+                            <Badge 
+                              variant="outline" 
+                              className="text-[10px] px-1.5 py-0 font-normal"
+                              style={{ 
+                                borderColor: user?.color,
+                                backgroundColor: user?.color ? `${user.color}15` : undefined,
+                                color: user?.color
+                              }}
+                            >
+                              {techName}
+                            </Badge>
                           );
                         })()}
                       </TableCell>
