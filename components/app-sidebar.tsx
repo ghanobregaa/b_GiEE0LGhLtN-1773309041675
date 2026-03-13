@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { FolderKanban, ListTodo, LayoutDashboard, Settings, Users } from "lucide-react"
+import { useAuthStore } from "@/lib/auth-store"
 
 const navigation = [
   {
@@ -32,9 +33,6 @@ const navigation = [
     icon: Settings,
   },
 ]
-
-import { useAuthStore } from "@/lib/auth-store"
-import { LogOut, User } from "lucide-react"
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -70,34 +68,6 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border mt-auto">
-        <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div
-            className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
-            style={{ backgroundColor: user?.color || "var(--primary)" }}
-          >
-            {user?.name?.charAt(0) || user?.username?.charAt(0) || <User className="h-4 w-4" />}
-          </div>
-          <div className="flex flex-col truncate">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium truncate">{user?.name || user?.username}</span>
-              {user?.role === "técnico" && (
-                <span className="text-[10px] font-bold px-1 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                  DEV
-                </span>
-              )}
-            </div>
-            <span className="text-xs text-muted-foreground truncate">@{user?.username}</span>
-          </div>
-        </div>
-        <button
-          onClick={() => logout()}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-        >
-          <LogOut className="h-5 w-5" />
-          Sair
-        </button>
-      </div>
     </aside>
   )
 }

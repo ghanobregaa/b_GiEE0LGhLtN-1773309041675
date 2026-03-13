@@ -124,39 +124,47 @@ export function Dashboard() {
     
     // Recalcula as horas reais totais considerando tarefas + reuniões (para os projetos filtrados)
     const totalActualHours = filteredProjects.reduce((acc, p) => acc + p.actualHours, 0)
-    const totalPlannedHours = filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0)
-
-    // Technician performance data
+    const totalPlannedHours = filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0)    // Technician performance data
     const techniciansMap: Record<string, { name: string; tasks: number; meetings: number; hours: number; color?: string }> = {}
     
     // Altura de tarefas
     filteredTasks.forEach(task => {
-      const tech = task.technician || "Sem Técnico"
-      if (!techniciansMap[tech]) {
-        const user = users.find(u => u.name === tech)
-        techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0, color: user?.color }
+      const techId = task.technicianId
+      const techNameStr = (task as any).technician // Suporte para dados antigos
+      
+      const user = techId ? users.find(u => u.id === techId) : users.find(u => u.name === techNameStr)
+      const techName = user?.name || techNameStr || "Sem Técnico"
+      const key = user?.id || techName
+
+      if (!techniciansMap[key]) {
+        techniciansMap[key] = { name: techName, tasks: 0, meetings: 0, hours: 0, color: user?.color }
       }
-      techniciansMap[tech].tasks += 1
-      techniciansMap[tech].hours += (task.actualHours || 0)
+      techniciansMap[key].tasks += 1
+      techniciansMap[key].hours += (task.actualHours || 0)
     })
 
     // Altura de reuniões
     filteredMeetings.forEach(meeting => {
-      meeting.technicians.forEach(tech => {
-        if (!techniciansMap[tech]) {
-          const user = users.find(u => u.name === tech)
-          techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0, color: user?.color }
+      meeting.technicians.forEach(tRef => {
+        // tRef pode ser ID ou Nome
+        const user = users.find(u => u.id === tRef || u.name === tRef)
+        const techName = user?.name || tRef || "Sem Técnico"
+        const key = user?.id || techName
+
+        if (!techniciansMap[key]) {
+          techniciansMap[key] = { name: techName, tasks: 0, meetings: 0, hours: 0, color: user?.color }
         }
-        techniciansMap[tech].meetings += 1
-        techniciansMap[tech].hours += meeting.durationHours
+        techniciansMap[key].meetings += 1
+        techniciansMap[key].hours += meeting.durationHours
       })
     })
 
-    const techData = Object.values(techniciansMap)
-      .filter(t => {
-        const user = users.find(u => u.name === t.name)
+    const techData = Object.entries(techniciansMap)
+      .filter(([key, data]) => {
+        const user = users.find(u => u.id === key || u.name === data.name)
         return user?.role === "técnico"
       })
+      .map(([_, data]) => data)
       .sort((a, b) => b.hours - a.hours)
 
     // Task status distribution
@@ -384,7 +392,7 @@ export function Dashboard() {
                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}h`} />
                 <Tooltip 
-                  cursor={{ fill: 'var(--muted)', opacity: 0.5 }}
+                  cursor={{ fill: 'rgba(0,0,0,0.05)', radius: 4 }}
                   contentStyle={{ 
                     backgroundColor: 'var(--background)', 
                     border: '1px solid var(--border)',

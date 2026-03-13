@@ -64,8 +64,10 @@ export function MeetingsList() {
         meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         meeting.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         meeting.attendees.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        meeting.technicians.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))
-
+        meeting.technicians.some(tId => {
+          const user = users.find(u => u.id === tId)
+          return user?.name.toLowerCase().includes(searchTerm.toLowerCase())
+        })
       const matchesProject = projectFilter === "all" || meeting.projectId === projectFilter
 
       return matchesSearch && matchesProject
@@ -205,16 +207,17 @@ export function MeetingsList() {
                     <TableCell>{meeting.durationHours}h</TableCell>
                     <TableCell>
                       <div className="flex -space-x-2 overflow-hidden">
-                        {meeting.technicians.slice(0, 3).map((tech, i) => {
-                          const user = users.find(u => u.name === tech);
+                        {meeting.technicians.slice(0, 3).map((techId, i) => {
+                          const user = users.find(u => u.id === techId);
+                          const displayName = user?.name || techId;
                           return (
                             <div
                               key={i}
                               className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[10px] font-medium text-white"
                               style={{ backgroundColor: user?.color || "#ccc" }}
-                              title={tech}
+                              title={displayName}
                             >
-                              {tech.charAt(0)}
+                              {displayName.charAt(0)}
                             </div>
                           );
                         })}

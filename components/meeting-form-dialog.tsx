@@ -145,11 +145,11 @@ export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectI
     }
   }
 
-  const toggleTech = (userName: string) => {
+  const toggleTech = (userId: string) => {
     setSelectedTechs((prev) =>
-      prev.includes(userName)
-        ? prev.filter((t) => t !== userName)
-        : [...prev, userName]
+      prev.includes(userId)
+        ? prev.filter((t) => t !== userId)
+        : [...prev, userId]
     )
   }
 
@@ -333,10 +333,10 @@ export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectI
                 {users.filter(u => u.role === "técnico").map((user) => (
                   <div
                     key={user.id}
-                    onClick={() => toggleTech(user.name)}
+                    onClick={() => toggleTech(user.id)}
                     className={cn(
                       "cursor-pointer px-3 py-1 rounded-full text-xs font-medium transition-colors border",
-                      selectedTechs.includes(user.name)
+                      selectedTechs.includes(user.id)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background text-muted-foreground hover:bg-muted"
                     )}

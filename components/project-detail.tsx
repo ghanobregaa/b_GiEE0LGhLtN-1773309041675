@@ -256,7 +256,8 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         {(() => {
-                          const user = users.find(u => u.name === phase.technician);
+                          const user = users.find(u => u.id === phase.technicianId);
+                          const name = user?.name || phase.technicianId || "Sem Técnico";
                           return user ? (
                             <Badge
                               variant="outline"
@@ -267,10 +268,10 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                                 color: user.color
                               }}
                             >
-                              {phase.technician}
+                              {name}
                             </Badge>
                           ) : (
-                            <span className="text-muted-foreground">{phase.technician}</span>
+                            <span className="text-muted-foreground">{name}</span>
                           );
                         })()}
                       </div>
@@ -403,8 +404,23 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                   {tasks.map((task) => (
                     <TableRow key={task.id}>
                       <TableCell className="font-medium">{task.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{task.technician}</TableCell>
-                      <TableCell className="text-muted-foreground">{task.requester}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const user = users.find(u => u.id === task.technicianId);
+                          return (
+                            <div className="flex items-center gap-2">
+                              {user?.color && (
+                                <div
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: user.color }}
+                                />
+                              )}
+                              <span>{user?.name || task.technicianId || "Sem Técnico"}</span>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                     <TableCell className="text-muted-foreground">{task.requester}</TableCell>
                       <TableCell className="text-center">{task.plannedHours}h</TableCell>
                       <TableCell className="text-center">{task.actualHours ?? "-"}h</TableCell>
                       <TableCell>
@@ -508,14 +524,22 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                     <TableCell className="text-center">{m.durationHours}h</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {m.technicians.map(t => (
-                          <Badge key={t} variant="outline" className="text-[10px] font-normal px-1">
-                            {t}
-                          </Badge>
-                        ))}
+                        {m.technicians.map(tId => {
+                          const user = users.find(u => u.id === tId);
+                          return (
+                            <Badge
+                              key={tId}
+                              variant="outline"
+                              className="text-[10px] font-normal px-1"
+                              style={user ? { borderColor: user.color, color: user.color } : {}}
+                            >
+                              {user?.name || tId}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     </TableCell>
-                    <TableCell>
+                   <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">

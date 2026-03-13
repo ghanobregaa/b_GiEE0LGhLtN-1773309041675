@@ -36,7 +36,7 @@ interface PhaseInput {
   id?: string
   type: PhaseType
   name: string
-  technician: string
+  technicianId: string
   plannedStartDate: string
   plannedEndDate: string
   plannedHours: number
@@ -54,7 +54,7 @@ interface ProjectFormDialogProps {
 const emptyPhase: PhaseInput = {
   type: "Requisitos",
   name: "",
-  technician: "",
+  technicianId: "",
   plannedStartDate: "",
   plannedEndDate: "",
   plannedHours: 0,
@@ -92,7 +92,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
             id: p.id,
             type: p.type,
             name: p.name,
-            technician: p.technician,
+            technicianId: p.technicianId,
             plannedStartDate: p.plannedStartDate,
             plannedEndDate: p.plannedEndDate,
             plannedHours: p.plannedHours,
@@ -384,15 +384,15 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Tecnico</Label>
                       <Select
-                        value={phase.technician}
-                        onValueChange={(value) => updatePhase(index, "technician", value)}
+                        value={phase.technicianId}
+                        onValueChange={(value) => updatePhase(index, "technicianId", value)}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
                           {users.filter(u => u.role === "técnico").map((user) => (
-                            <SelectItem key={user.id} value={user.name}>
+                            <SelectItem key={user.id} value={user.id}>
                               <div className="flex items-center gap-2">
                                 <div 
                                   className="w-2.5 h-2.5 rounded-full" 

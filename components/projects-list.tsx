@@ -46,6 +46,7 @@ import {
 } from "lucide-react"
 import { getApiUrl } from "@/lib/api-config"
 import { useAuthStore } from "@/lib/auth-store"
+import { useRouter } from "next/navigation"
 
 export function ProjectsList() {
   const projects = useProjectStore((state) => state.projects)
@@ -309,9 +310,13 @@ interface ProjectRowProps {
 
 function ProjectRow({ project, onEdit, onDelete, isVisitor }: ProjectRowProps) {
   const progress = calculateProjectProgress(project)
+  const router = useRouter()
 
   return (
-    <TableRow className="hover:bg-muted/50">
+    <TableRow 
+      className="hover:bg-muted/50 cursor-pointer select-none"
+      onDoubleClick={() => router.push(`/projetos/${project.id}`)}
+    >
       <TableCell>
         <div className="flex flex-col">
           <Link

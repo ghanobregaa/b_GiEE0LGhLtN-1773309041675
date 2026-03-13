@@ -53,7 +53,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
     phaseId: "",
     name: "",
     ticket: "",
-    technician: currentUser?.name || "",
+    technicianId: currentUser?.id || "",
     requester: "",
     plannedStartDate: "",
     plannedEndDate: "",
@@ -74,7 +74,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
           phaseId: editTask.phaseId || "",
           name: editTask.name,
           ticket: editTask.ticket || "",
-          technician: editTask.technician,
+          technicianId: editTask.technicianId,
           requester: editTask.requester,
           plannedStartDate: editTask.plannedStartDate,
           plannedEndDate: editTask.plannedEndDate,
@@ -91,7 +91,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
           phaseId: "",
           name: "",
           ticket: "",
-          technician: "",
+          technicianId: "",
           requester: "",
           plannedStartDate: "",
           plannedEndDate: "",
@@ -114,7 +114,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
       phaseId: formData.phaseId === "none" ? undefined : (formData.phaseId || undefined),
       name: formData.name,
       ticket: formData.ticket || undefined,
-      technician: formData.technician,
+      technicianId: formData.technicianId,
       requester: formData.requester,
       plannedStartDate: formData.plannedStartDate,
       plannedEndDate: formData.plannedEndDate,
@@ -140,7 +140,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
   const isValid =
     formData.projectId &&
     formData.name &&
-    formData.technician &&
+    formData.technicianId &&
     formData.requester &&
     formData.plannedStartDate &&
     formData.plannedEndDate &&
@@ -244,17 +244,17 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="technician">Técnico</Label>
+              <Label htmlFor="technicianId">Técnico</Label>
               <Select
-                value={formData.technician}
-                onValueChange={(value) => setFormData({ ...formData, technician: value })}
+                value={formData.technicianId}
+                onValueChange={(value) => setFormData({ ...formData, technicianId: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um técnico" />
                 </SelectTrigger>
                 <SelectContent>
                   {users.filter(u => u.role === "técnico").map((user) => (
-                    <SelectItem key={user.id} value={user.name}>
+                    <SelectItem key={user.id} value={user.id}>
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-2.5 h-2.5 rounded-full" 

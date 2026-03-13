@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS phases (
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     type phase_type NOT NULL,
     name TEXT NOT NULL,
-    technician TEXT NOT NULL,
+    technician_id UUID REFERENCES users(id), -- Alterado para ID
+    technician TEXT, -- Manter temporariamente para compatibilidade
     planned_start_date DATE NOT NULL,
     planned_end_date DATE NOT NULL,
     planned_hours FLOAT DEFAULT 0,
@@ -52,14 +53,15 @@ CREATE TABLE IF NOT EXISTS phases (
     actual_hours FLOAT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
+ Broadway
 -- ─── Tabela TASKS ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     ticket TEXT,
-    technician TEXT NOT NULL,
+    technician_id UUID REFERENCES users(id), -- Alterado para ID
+    technician TEXT, -- Manter temporariamente para compatibilidade
     requester TEXT NOT NULL,
     planned_start_date DATE NOT NULL,
     planned_end_date DATE NOT NULL,
@@ -70,7 +72,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     status task_status DEFAULT 'Pendente',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
+ Broadway
 -- ─── Desactivar RLS (usamos service_role key no backend) ────
 ALTER TABLE projects DISABLE ROW LEVEL SECURITY;
 ALTER TABLE phases DISABLE ROW LEVEL SECURITY;
@@ -110,14 +112,6 @@ ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 INSERT INTO users (username, password_hash, name, color)
 VALUES ('admin', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Gestor', '#6366f1')
 ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
-
--- Adicionar técnicos iniciais (password default: devafa)
-INSERT INTO users (username, password_hash, name, color)
-VALUES 
-('gno', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Guilherme Nóbrega', '#f59e0b'),
-('mgo', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Miguel Góis', '#10b981'),
-('rna', 'scrypt:32768:8:1$Wqry7vzss6iRvfsR$23cc1d6ad356a088319eb4906c700beca02630fb3065b9f9efc00e044a1d3d7e7c1cb771e8389fee4b292423ea47989af33a42b97ae6f94ebe208ba4ae33ed0c', 'Rúben Nascimento', '#8b5cf6')
-ON CONFLICT (username) DO NOTHING;
 
 -- ─── Tabela MEETINGS ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS meetings (

@@ -27,7 +27,7 @@ export interface Meeting {
   date: string
   startTime: string
   durationHours: number
-  technicians: string[]
+  technicians: string[] // Agora guarda IDs de utilizadores
   attendees: string
   notes: string
   checklist: MeetingChecklistItem[]
@@ -37,7 +37,7 @@ export interface Phase {
   id: string
   type: PhaseType
   name: string
-  technician: string
+  technicianId: string // Alterado de technician (string) para ID
   plannedStartDate: string
   plannedEndDate: string
   plannedHours: number
@@ -53,7 +53,7 @@ export interface Task {
   projectName: string
   name: string
   ticket?: string
-  technician: string
+  technicianId: string   // Alterado de technician (string) para ID
   requester: string
   plannedStartDate: string
   plannedEndDate: string
@@ -101,7 +101,7 @@ export const projects: Project[] = [
         id: "1-1",
         type: "Requisitos",
         name: "Levantamento de requisitos",
-        technician: "MG",
+        technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
         plannedStartDate: "2025-09-25",
         plannedEndDate: "2025-10-10",
         plannedHours: 40,
@@ -113,7 +113,7 @@ export const projects: Project[] = [
         id: "1-2",
         type: "Desenvolvimento",
         name: "Desenvolvimento do sistema",
-        technician: "MG",
+        technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
         plannedStartDate: "2025-10-11",
         plannedEndDate: "2026-04-30",
         plannedHours: 400,
@@ -124,7 +124,7 @@ export const projects: Project[] = [
         id: "1-3",
         type: "Testes",
         name: "Testes e validação",
-        technician: "MG",
+        technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
         plannedStartDate: "2026-05-01",
         plannedEndDate: "2026-05-29",
         plannedHours: 60,
@@ -159,7 +159,7 @@ export const projects: Project[] = [
         id: "2-2",
         type: "Desenvolvimento",
         name: "Desenvolvimento da plataforma",
-        technician: "JC",
+        technicianId: "3",
         plannedStartDate: "2026-02-16",
         plannedEndDate: "2026-05-30",
         plannedHours: 200,
@@ -192,7 +192,7 @@ export const projects: Project[] = [
         id: "3-1",
         type: "Requisitos",
         name: "Levantamento de requisitos",
-        technician: "MG",
+        technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
         plannedStartDate: "2026-04-01",
         plannedEndDate: "2026-04-07",
         plannedHours: 20,
@@ -203,7 +203,7 @@ export const projects: Project[] = [
         id: "3-2",
         type: "Desenvolvimento",
         name: "Desenvolvimento do website",
-        technician: "MG",
+        technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
         plannedStartDate: "2026-04-08",
         plannedEndDate: "2026-05-20",
         plannedHours: 350,
@@ -212,7 +212,7 @@ export const projects: Project[] = [
         id: "3-3",
         type: "Testes",
         name: "Testes e lançamento",
-        technician: "MG",
+        technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
         plannedStartDate: "2026-05-21",
         plannedEndDate: "2026-05-31",
         plannedHours: 40,
@@ -236,7 +236,7 @@ export const projects: Project[] = [
         id: "4-1",
         type: "Requisitos",
         name: "Levantamento de requisitos",
-        technician: "GN",
+        technician: "ac3c395a-41c9-488d-a609-48af95b8d854",
         plannedStartDate: "2026-02-16",
         plannedEndDate: "2026-02-20",
         plannedHours: 10,
@@ -248,7 +248,7 @@ export const projects: Project[] = [
         id: "4-2",
         type: "Desenvolvimento",
         name: "Desenvolvimento do robot",
-        technician: "GN",
+        technician: "ac3c395a-41c9-488d-a609-48af95b8d854",
         plannedStartDate: "2026-03-09",
         plannedEndDate: "2026-03-13",
         plannedHours: 40,
@@ -259,7 +259,7 @@ export const projects: Project[] = [
         id: "4-3",
         type: "Testes",
         name: "Testes",
-        technician: "GN",
+        technician: "ac3c395a-41c9-488d-a609-48af95b8d854",
         plannedStartDate: "2026-03-16",
         plannedEndDate: "2026-03-20",
         plannedHours: 40,
@@ -378,8 +378,8 @@ export const tasks: Task[] = [
     projectId: "1",
     projectName: "Audit Desk",
     name: "Desenvolvimento do Sheet",
-    ticket: "GN",
-    technician: "MG",
+    ticket: "ac3c395a-41c9-488d-a609-48af95b8d854",
+    technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
     requester: "Francisco Carneiro",
     plannedStartDate: "2026-02-24",
     plannedEndDate: "2026-02-24",
@@ -469,7 +469,7 @@ export const tasks: Task[] = [
     projectId: "1",
     projectName: "Audit Desk",
     name: "Fazer lógica para gerir de permissões dos utilizadores",
-    technician: "MG",
+    technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
     requester: "Mariana Gonçalves",
     plannedStartDate: "2026-02-26",
     plannedEndDate: "2026-02-27",
@@ -485,7 +485,7 @@ export const tasks: Task[] = [
     projectId: "2",
     projectName: "Comunicações Internas",
     name: "Upload de excel com a lista de emails",
-    ticket: "GN",
+    ticket: "ac3c395a-41c9-488d-a609-48af95b8d854",
     technician: "SD",
     requester: "Silvia Dias / Jéssica Costa",
     plannedStartDate: "2026-02-26",
@@ -535,8 +535,8 @@ export const tasks: Task[] = [
     projectId: "4",
     projectName: "ROBOT Dertour",
     name: "Alterações de processos",
-    ticket: "GN",
-    technician: "GN",
+    ticket: "ac3c395a-41c9-488d-a609-48af95b8d854",
+    technician: "ac3c395a-41c9-488d-a609-48af95b8d854",
     requester: "Guilherme Nóbrega",
     plannedStartDate: "2026-02-25",
     plannedEndDate: "2026-02-25",
@@ -552,7 +552,7 @@ export const tasks: Task[] = [
     projectName: "ROBOT Dertour",
     name: "Verificação do processo de listagens",
     ticket: "#52050",
-    technician: "GN",
+    technician: "ac3c395a-41c9-488d-a609-48af95b8d854",
     requester: "Catarina Gonçalves",
     plannedStartDate: "2026-02-26",
     plannedEndDate: "2026-02-26",

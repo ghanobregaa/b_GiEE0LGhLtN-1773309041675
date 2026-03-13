@@ -79,6 +79,8 @@ def to_snake(data: dict) -> dict:
         "startTime":        "start_time",
         "durationHours":    "duration_hours",
         "duration_hours":   "duration_hours",
+        "technicianId":     "technician_id",
+        "technician_id":    "technician_id",
     }
     result = {}
     for k, v in data.items():
@@ -105,16 +107,17 @@ def get_projects():
 def create_project():
     try:
         data = request.json
-        payload = to_snake({
-            "name":             data.get("name"),
-            "description":      data.get("description"),
-            "owner":            data.get("owner"),
-            "status":           data.get("status", "Novo"),
-            "plannedStartDate": data.get("plannedStartDate"),
-            "plannedEndDate":   data.get("plannedEndDate"),
-            "plannedHours":     data.get("plannedHours", 0),
-            "company":          data.get("company", "SAVOY"),
-        })
+        payload = to_snake(data)
+        
+        # Defaults
+        if "status" not in payload: payload["status"] = "Novo"
+        if "company" not in payload: payload["company"] = "SAVOY"
+        if "planned_hours" not in payload: payload["planned_hours"] = 0
+        
+        # Ensure UUID fields are not empty strings
+        for field in ["owner"]: # owner is text but just in case
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("projects").insert(payload).execute()
         new_project = res.data[0] if res.data else {}
@@ -209,15 +212,15 @@ def export_projects_excel():
 def create_phase(project_id):
     try:
         data = request.json
-        payload = to_snake({
-            "project_id":       project_id,
-            "type":             data.get("type"),
-            "name":             data.get("name"),
-            "technician":       data.get("technician"),
-            "plannedStartDate": data.get("plannedStartDate"),
-            "plannedEndDate":   data.get("plannedEndDate"),
-            "plannedHours":     data.get("plannedHours", 0),
-        })
+        payload = to_snake(data)
+        payload["project_id"] = project_id
+        
+        if "planned_hours" not in payload: payload["planned_hours"] = 0
+        
+        # Ensure UUID fields are not empty strings
+        for field in ["project_id", "technician_id"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("phases").insert(payload).execute()
         return jsonify(res.data[0] if res.data else {}), 201
@@ -261,21 +264,14 @@ def get_tasks():
 def create_task():
     try:
         data = request.json
-        payload = to_snake({
-            "projectId":        data.get("projectId"),
-            "name":             data.get("name"),
-            "ticket":           data.get("ticket"),
-            "technician":       data.get("technician"),
-            "requester":        data.get("requester"),
-            "plannedStartDate": data.get("plannedStartDate"),
-            "plannedEndDate":   data.get("plannedEndDate"),
-            "plannedHours":     data.get("plannedHours", 0),
-            "actualStartDate":  data.get("actualStartDate"),
-            "actualEndDate":    data.get("actualEndDate"),
-            "actualHours":      data.get("actualHours"),
-            "status":           data.get("status", "Pendente"),
-            "phaseId":          data.get("phaseId"),
-        })
+        payload = to_snake(data)
+        if "status" not in payload: payload["status"] = "Pendente"
+        if "planned_hours" not in payload: payload["planned_hours"] = 0
+
+        # Ensure UUID fields are not empty strings
+        for field in ["project_id", "phase_id", "technician_id"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("tasks").insert(payload).execute()
         new_task = res.data[0] if res.data else {}
@@ -413,7 +409,9 @@ def create_user():
             "role": data.get("role", "técnico")
         }
         
+        print(f"DEBUG: Creating user with payload: {payload}")
         res = supabase.table("users").insert(payload).execute()
+        print(f"DEBUG: Supabase response: {res.data}")
         if res.data:
             user = res.data[0]
             del user["password_hash"]
@@ -436,7 +434,10 @@ def update_user(id):
         if "password" in data and data["password"]:
             payload["password_hash"] = generate_password_hash(data["password"])
 
+        print(f"DEBUG: Updating user {id} with payload: {payload}")
         res = supabase.table("users").update(payload).eq("id", id).execute()
+        print(f"DEBUG: Supabase response for update: {res.data}")
+        
         if res.data:
             user = res.data[0]
             if "password_hash" in user: del user["password_hash"]
