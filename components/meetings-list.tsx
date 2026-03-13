@@ -49,7 +49,7 @@ import { MeetingFormDialog } from "./meeting-form-dialog"
 import { exportMeetingToPDF } from "@/lib/pdf-export"
 
 export function MeetingsList() {
-  const { meetings, projects, deleteMeeting } = useProjectStore()
+  const { meetings, projects, deleteMeeting, users } = useProjectStore()
   const [searchTerm, setSearchTerm] = useState("")
   const [projectFilter, setProjectFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -186,23 +186,33 @@ export function MeetingsList() {
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-1 text-xs">
-                        <CalendarIcon className="h-3 w-3 opacity-50" />
-                        {formatDate(meeting.date)}
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                          <CalendarIcon className="h-3 w-3 opacity-50" />
+                          {formatDate(meeting.date)}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground ml-4">
+                          <Clock className="h-3 w-3 opacity-50" />
+                          {meeting.startTime}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>{meeting.durationHours}h</TableCell>
                     <TableCell>
                       <div className="flex -space-x-2 overflow-hidden">
-                        {meeting.technicians.slice(0, 3).map((tech, i) => (
-                          <div
-                            key={i}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium"
-                            title={tech}
-                          >
-                            {tech.charAt(0)}
-                          </div>
-                        ))}
+                        {meeting.technicians.slice(0, 3).map((tech, i) => {
+                          const user = users.find(u => u.name === tech);
+                          return (
+                            <div
+                              key={i}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[10px] font-medium text-white"
+                              style={{ backgroundColor: user?.color || "#ccc" }}
+                              title={tech}
+                            >
+                              {tech.charAt(0)}
+                            </div>
+                          );
+                        })}
                         {meeting.technicians.length > 3 && (
                           <div className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground text-[10px] font-medium">
                             +{meeting.technicians.length - 3}

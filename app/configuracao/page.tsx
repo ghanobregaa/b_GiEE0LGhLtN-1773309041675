@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuthStore } from "@/lib/auth-store"
+import { useProjectStore } from "@/lib/store"
 import { getApiUrl } from "@/lib/api-config"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,34 +10,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Trash2, UserPlus, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-interface User {
-  id: string
-  username: string
-  name: string
-  created_at: string
-}
+import { type User } from "@/lib/data"
 
 export default function ConfiguracaoPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const users = useProjectStore((state) => state.users)
+  const fetchUsers = useProjectStore((state) => state.fetchUsers)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
   const [newUsername, setNewUsername] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [newName, setNewName] = useState("")
-
-  const fetchUsers = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`${getApiUrl()}/users`)
-      if (!res.ok) throw new Error("Erro ao carregar utilizadores")
-      const data = await res.json()
-      setUsers(data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [newColor, setNewColor] = useState("#6366f1")
+  const [editingUser, setEditingUser] = useState<User | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -52,18 +37,58 @@ export default function ConfiguracaoPage() {
         body: JSON.stringify({
           username: newUsername,
           password: newPassword,
-          name: newName
+          name: newName,
+          color: newColor
         }),
       })
       if (!res.ok) throw new Error("Erro ao criar utilizador")
       
-      setNewUsername("")
-      setNewPassword("")
-      setNewName("")
+      resetForm()
       fetchUsers()
     } catch (err: any) {
       setError(err.message)
     }
+  }
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+    try {
+      const res = await fetch(`${getApiUrl()}/users/${editingUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: newUsername,
+          name: newName,
+          color: newColor,
+          ...(newPassword ? { password: newPassword } : {})
+        }),
+      })
+      if (!res.ok) throw new Error("Erro ao atualizar utilizador")
+      
+      resetForm()
+      fetchUsers()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  const resetForm = () => {
+    setNewUsername("")
+    setNewPassword("")
+    setNewName("")
+    setNewColor("#6366f1")
+    setEditingUser(null)
+    setError(null)
+  }
+
+  const startEdit = (user: User) => {
+    setEditingUser(user)
+    setNewUsername(user.username)
+    setNewName(user.name)
+    setNewColor(user.color || "#6366f1")
+    setNewPassword("")
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const handleDeleteUser = async (id: string) => {
@@ -91,14 +116,16 @@ export default function ConfiguracaoPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
-              Adicionar Novo Utilizador
+              {editingUser ? "Editar Utilizador" : "Adicionar Novo Utilizador"}
             </CardTitle>
             <CardDescription>
-              Crie um novo perfil de acesso ao sistema.
+              {editingUser 
+                ? `A editar perfil de @${editingUser.username}. Deixe a password em branco para não alterar.` 
+                : "Crie um novo perfil de acesso ao sistema."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCreateUser} className="space-y-4">
+            <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser} className="space-y-4">
               <div className="space-y-2">
                 <Input
                   placeholder="Nome Completo"
@@ -113,18 +140,47 @@ export default function ConfiguracaoPage() {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   required
+                  disabled={editingUser?.username === 'admin'}
                 />
               </div>
               <div className="space-y-2">
                 <Input
                   type="password"
-                  placeholder="Palavra-passe"
+                  placeholder={editingUser ? "Nova Palavra-passe (opcional)" : "Palavra-passe"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  required
+                  required={!editingUser}
                 />
               </div>
-              <Button type="submit" className="w-full">Criar Utilizador</Button>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-10 h-10 rounded-full border-2 border-background shadow-sm" 
+                    style={{ backgroundColor: newColor }}
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium mb-1">Cor de Referência</p>
+                    <Input
+                      type="color"
+                      value={newColor}
+                      onChange={(e) => setNewColor(e.target.value)}
+                      className="h-8 p-1 cursor-pointer w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                {editingUser && (
+                  <Button type="button" variant="outline" className="flex-1" onClick={resetForm}>
+                    Cancelar
+                  </Button>
+                )}
+                <Button type="submit" className="flex-[2]">
+                  {editingUser ? "Atualizar Utilizador" : "Criar Utilizador"}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -145,6 +201,7 @@ export default function ConfiguracaoPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">Cor</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead className="w-[100px]">Ações</TableHead>
@@ -153,18 +210,35 @@ export default function ConfiguracaoPage() {
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell>
+                      <div 
+                        className="w-6 h-6 rounded-full border border-background shadow-xs m-auto" 
+                        style={{ backgroundColor: user.color || "#ccc" }}
+                        title={user.color}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>@{user.username}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        onClick={() => handleDeleteUser(user.id)}
-                        disabled={user.username === 'admin'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => startEdit(user)}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => handleDeleteUser(user.id)}
+                          disabled={user.username === 'admin'}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

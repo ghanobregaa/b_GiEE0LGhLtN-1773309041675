@@ -74,6 +74,9 @@ def to_snake(data: dict) -> dict:
         "projectId":        "project_id",
         "phaseId":          "phase_id",
         "company":          "company",
+        "startTime":        "start_time",
+        "durationHours":    "duration_hours",
+        "duration_hours":   "duration_hours",
     }
     result = {}
     for k, v in data.items():
@@ -323,49 +326,51 @@ def get_meetings():
 def create_meeting():
     try:
         data = request.json
-        payload = {
-            "title": data.get("title"),
-            "project_id": data.get("projectId") or None,
-            "date": data.get("date"),
-            "duration_hours": data.get("durationHours", 0),
-            "technicians": data.get("technicians", []),
-            "attendees": data.get("attendees", ""),
-            "notes": data.get("notes", ""),
-            "checklist": data.get("checklist", [])
-        }
-
+        payload = to_snake(data)
+        
+        # Garante o project_id como None se for vazio
+        if "project_id" in payload and not payload["project_id"]:
+            payload["project_id"] = None
+            
         res = supabase.table("meetings").insert(payload).execute()
-        new_meeting = res.data[0] if res.data else {}
+        
+        if not res.data:
+            return jsonify({"error": "Não foi possível criar a reunião"}), 400
+            
+        new_meeting = res.data[0]
         new_meeting["project_name"] = ""
 
         if new_meeting.get("project_id"):
             proj_res = supabase.table("projects").select("name").eq("id", new_meeting["project_id"]).single().execute()
             if proj_res.data:
-                new_meeting["project_name"] = proj_res.data["name"]
+                new_meeting["project_name"] = proj_res.data.get("name", "")
 
         return jsonify(new_meeting), 201
     except Exception as e:
+        print(f"ERRO CREATE MEETING: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/meetings/<id>', methods=['PUT'])
 def update_meeting(id):
     try:
         data = request.json
-        payload = {}
-        if "title" in data: payload["title"] = data["title"]
-        if "projectId" in data: payload["project_id"] = data["projectId"] or None
-        if "date" in data: payload["date"] = data["date"]
-        if "durationHours" in data: payload["duration_hours"] = data["durationHours"]
-        if "technicians" in data: payload["technicians"] = data["technicians"]
-        if "attendees" in data: payload["attendees"] = data["attendees"]
-        if "notes" in data: payload["notes"] = data["notes"]
-        if "checklist" in data: payload["checklist"] = data["checklist"]
+        payload = to_snake(data)
+        
+        # Remove campos que não devem ser atualizados
+        payload.pop("id", None)
+        payload.pop("project_name", None)
+        
+        if "project_id" in payload and not payload["project_id"]:
+            payload["project_id"] = None
 
         res = supabase.table("meetings").update(payload).eq("id", id).execute()
-        if res.data:
-            return jsonify(res.data[0])
-        return jsonify({"error": "Meeting not found"}), 404
+        
+        if not res.data:
+            return jsonify({"error": "Reunião não encontrada ou erro na atualização"}), 404
+            
+        return jsonify(res.data[0])
     except Exception as e:
+        print(f"ERRO UPDATE MEETING: {str(e)}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/meetings/<id>', methods=['DELETE'])
@@ -381,7 +386,7 @@ def delete_meeting(id):
 @app.route('/api/users', methods=['GET'])
 def get_users():
     try:
-        res = supabase.table("users").select("id, username, name, created_at").execute()
+        res = supabase.table("users").select("id, username, name, color, created_at").execute()
         return jsonify(res.data)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -393,22 +398,46 @@ def create_user():
         username = data.get("username")
         password = data.get("password")
         name = data.get("name")
-
+        color = data.get("color", "#6366f1")
+        
         if not username or not password:
             return jsonify({"error": "Faltam campos obrigatórios"}), 400
 
         payload = {
             "username": username,
             "name": name or username,
-            "password_hash": generate_password_hash(password)
+            "password_hash": generate_password_hash(password),
+            "color": color
         }
-
+        
         res = supabase.table("users").insert(payload).execute()
         if res.data:
             user = res.data[0]
             del user["password_hash"]
             return jsonify(user), 201
         return jsonify({"error": "Não foi possível criar o utilizador"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/users/<id>', methods=['PUT'])
+def update_user(id):
+    try:
+        data = request.json
+        payload = {}
+        if "name" in data: payload["name"] = data["name"]
+        if "username" in data: payload["username"] = data["username"]
+        if "color" in data: payload["color"] = data["color"]
+        
+        # Se password for enviada, atualiza também
+        if "password" in data and data["password"]:
+            payload["password_hash"] = generate_password_hash(data["password"])
+
+        res = supabase.table("users").update(payload).eq("id", id).execute()
+        if res.data:
+            user = res.data[0]
+            if "password_hash" in user: del user["password_hash"]
+            return jsonify(user)
+        return jsonify({"error": "Utilizador não encontrado"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 

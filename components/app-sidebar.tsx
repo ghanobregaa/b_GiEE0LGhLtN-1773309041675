@@ -44,7 +44,7 @@ export function AppSidebar() {
     <aside className="fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card flex flex-col">
       <div className="flex h-16 items-center gap-2 border-b border-border px-6 shrink-0">
         <FolderKanban className="h-6 w-6 text-primary" />
-        <span className="text-lg font-semibold">Project Sync</span>
+        <span className="text-lg font-semibold">AFADev</span>
       </div>
       <nav className="flex flex-col gap-1 p-4 flex-1">
         {navigation.map((item) => {

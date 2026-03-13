@@ -28,7 +28,12 @@ import {
   CalendarDays,
   X,
   Users,
+  CalendarIcon,
 } from "lucide-react"
+import { format } from "date-fns"
+import { pt } from "date-fns/locale"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
 import {
   BarChart,
   Bar,
@@ -47,7 +52,7 @@ export function Dashboard() {
   const projects = useProjectStore((state) => state.projects)
   const tasks = useProjectStore((state) => state.tasks)
   const meetings = useProjectStore((state) => state.meetings)
-
+  const users = useProjectStore((state) => state.users)
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: "",
     end: "",
@@ -122,13 +127,14 @@ export function Dashboard() {
     const totalPlannedHours = filteredProjects.reduce((acc, p) => acc + p.plannedHours, 0)
 
     // Technician performance data
-    const techniciansMap: Record<string, { name: string; tasks: number; meetings: number; hours: number }> = {}
+    const techniciansMap: Record<string, { name: string; tasks: number; meetings: number; hours: number; color?: string }> = {}
     
     // Altura de tarefas
     filteredTasks.forEach(task => {
       const tech = task.technician || "Sem Técnico"
       if (!techniciansMap[tech]) {
-        techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0 }
+        const user = users.find(u => u.name === tech)
+        techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0, color: user?.color }
       }
       techniciansMap[tech].tasks += 1
       techniciansMap[tech].hours += (task.actualHours || 0)
@@ -138,7 +144,8 @@ export function Dashboard() {
     filteredMeetings.forEach(meeting => {
       meeting.technicians.forEach(tech => {
         if (!techniciansMap[tech]) {
-          techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0 }
+          const user = users.find(u => u.name === tech)
+          techniciansMap[tech] = { name: tech, tasks: 0, meetings: 0, hours: 0, color: user?.color }
         }
         techniciansMap[tech].meetings += 1
         techniciansMap[tech].hours += meeting.durationHours
@@ -166,7 +173,7 @@ export function Dashboard() {
       techData,
       statusData
     }
-  }, [filteredProjects, filteredTasks, filteredMeetings])
+  }, [filteredProjects, filteredTasks, filteredMeetings, users])
 
   const recentProjects = filteredProjects.slice(0, 5)
   const activeTasks = filteredTasks.filter((t) => t.status !== "Concluído").slice(0, 5)
@@ -209,31 +216,71 @@ export function Dashboard() {
                   </p>
                 </div>
                 <div className="grid gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="start-date" className="text-xs">
+                  <div className="space-y-1 flex flex-col">
+                    <Label htmlFor="start-date" className="text-xs mb-1">
                       Data Início
                     </Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={dateRange.start}
-                      onChange={(e) =>
-                        setDateRange((prev) => ({ ...prev, start: e.target.value }))
-                      }
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal h-9",
+                            !dateRange.start && "text-muted-foreground"
+                          )}
+                        >
+                          {dateRange.start ? (
+                            format(new Date(dateRange.start), "PPP", { locale: pt })
+                          ) : (
+                            <span>Escolher data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dateRange.start ? new Date(dateRange.start) : undefined}
+                          onSelect={(date) =>
+                            setDateRange((prev) => ({ ...prev, start: date ? format(date, "yyyy-MM-dd") : "" }))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="end-date" className="text-xs">
+                  <div className="space-y-1 flex flex-col">
+                    <Label htmlFor="end-date" className="text-xs mb-1">
                       Data Fim
                     </Label>
-                    <Input
-                      id="end-date"
-                      type="date"
-                      value={dateRange.end}
-                      onChange={(e) =>
-                        setDateRange((prev) => ({ ...prev, end: e.target.value }))
-                      }
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal h-9",
+                            !dateRange.end && "text-muted-foreground"
+                          )}
+                        >
+                          {dateRange.end ? (
+                            format(new Date(dateRange.end), "PPP", { locale: pt })
+                          ) : (
+                            <span>Escolher data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dateRange.end ? new Date(dateRange.end) : undefined}
+                          onSelect={(date) =>
+                            setDateRange((prev) => ({ ...prev, end: date ? format(date, "yyyy-MM-dd") : "" }))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
                 {hasDateFilter && (
@@ -332,14 +379,23 @@ export function Dashboard() {
                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}h`} />
                 <Tooltip 
-                  cursor={{fill: 'hsl(var(--muted)/0.5)'}}
+                  cursor={{ fill: 'var(--muted)', opacity: 0.5 }}
                   contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                    backgroundColor: 'var(--background)', 
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    color: 'var(--foreground)'
                   }}
+                  itemStyle={{ color: 'var(--foreground)' }}
+                  labelStyle={{ color: 'var(--foreground)' }}
                 />
-                <Bar dataKey="hours" name="Horas Reais" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar 
+                  dataKey="hours" 
+                  name="Horas Reais" 
+                  fill="var(--primary)" 
+                  radius={[4, 4, 0, 0]}
+                  activeBar={{ opacity: 0.8 }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -360,6 +416,7 @@ export function Dashboard() {
                   outerRadius={100}
                   paddingAngle={5}
                   dataKey="value"
+                  activeShape={{ opacity: 0.8 }}
                 >
                   {stats.statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -367,10 +424,12 @@ export function Dashboard() {
                 </Pie>
                 <Tooltip 
                   contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                    backgroundColor: 'var(--background)', 
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    color: 'var(--foreground)'
                   }}
+                  itemStyle={{ color: 'var(--foreground)' }}
                 />
                 <Legend />
               </PieChart>
@@ -389,11 +448,17 @@ export function Dashboard() {
             <div className="space-y-4">
               {stats.techData.map((tech) => (
                 <div key={tech.name} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
-                  <div>
-                    <p className="font-medium">{tech.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {tech.tasks} tarefas | {tech.meetings} reuniões
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-2 h-8 rounded-full" 
+                      style={{ backgroundColor: tech.color || "#ccc" }}
+                    />
+                    <div>
+                      <p className="font-medium">{tech.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {tech.tasks} tarefas | {tech.meetings} reuniões
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-lg">{tech.hours.toFixed(1)}h</p>

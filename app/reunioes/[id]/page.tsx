@@ -32,7 +32,7 @@ import { MeetingFormDialog } from "@/components/meeting-form-dialog"
 export default function MeetingDetailsPage() {
   const { id } = useParams()
   const router = useRouter()
-  const { meetings, deleteMeeting, updateMeeting } = useProjectStore()
+  const { meetings, deleteMeeting, updateMeeting, users } = useProjectStore()
   const [meeting, setMeeting] = useState<Meeting | undefined>(undefined)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -105,7 +105,7 @@ export default function MeetingDetailsPage() {
                 <CardDescription className="flex items-center gap-4 mt-2">
                   <span className="flex items-center gap-1.5">
                     <CalendarIcon className="h-4 w-4" />
-                    {formatDate(meeting.date)}
+                    {formatDate(meeting.date)} às {meeting.startTime}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Clock className="h-4 w-4" />
@@ -130,11 +130,23 @@ export default function MeetingDetailsPage() {
                   Participantes Internos
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {meeting.technicians.map((tech, i) => (
-                    <Badge key={i} variant="outline" className="bg-primary/5 border-primary/20">
-                      {tech}
-                    </Badge>
-                  ))}
+                  {meeting.technicians.map((tech, i) => {
+                    const user = users.find(u => u.name === tech);
+                    return (
+                      <Badge 
+                        key={i} 
+                        variant="outline" 
+                        className="bg-primary/5 border-primary/20"
+                        style={{ 
+                          borderColor: user?.color, 
+                          backgroundColor: user?.color ? `${user.color}15` : undefined,
+                          color: user?.color 
+                        }}
+                      >
+                        {tech}
+                      </Badge>
+                    );
+                  })}
                   {meeting.technicians.length === 0 && <span className="text-sm text-muted-foreground italic">Nenhum técnico registado</span>}
                 </div>
               </div>

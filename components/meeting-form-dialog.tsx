@@ -8,6 +8,7 @@ import { CalendarIcon, Loader2, Plus, Trash2, X } from "lucide-react"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -47,6 +48,7 @@ const formSchema = z.object({
   title: z.string().min(2, "O título deve ter pelo menos 2 caracteres"),
   projectId: z.string().default("none"),
   date: z.string().min(1, "A data é obrigatória"),
+  startTime: z.string().min(1, "A hora de início é obrigatória"),
   durationHours: z.coerce.number().min(0.1, "A duração deve ser superior a 0"),
   attendees: z.string().default(""),
   notes: z.string().default(""),
@@ -56,11 +58,13 @@ interface MeetingFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   meeting?: Meeting
+  defaultProjectId?: string
 }
 
-export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDialogProps) {
+export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectId }: MeetingFormDialogProps) {
   const { projects, users, addMeeting, updateMeeting } = useProjectStore()
   const [isLoading, setIsLoading] = useState(false)
+  const [errorStatus, setErrorStatus] = useState<string | null>(null)
   const [selectedTechs, setSelectedTechs] = useState<string[]>([])
   const [checklist, setChecklist] = useState<MeetingChecklistItem[]>([])
   const [newChecklistItem, setNewChecklistItem] = useState("")
@@ -73,6 +77,7 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
       title: "",
       projectId: "",
       date: format(new Date(), "yyyy-MM-dd"),
+      startTime: format(new Date(), "HH:mm"),
       durationHours: 1,
       attendees: "",
       notes: "",
@@ -85,6 +90,7 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
         title: meeting.title,
         projectId: meeting.projectId || "none",
         date: meeting.date,
+        startTime: meeting.startTime,
         durationHours: meeting.durationHours,
         attendees: meeting.attendees,
         notes: meeting.notes,
@@ -95,8 +101,9 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
     } else {
       form.reset({
         title: "",
-        projectId: "none",
+        projectId: defaultProjectId || "none",
         date: format(new Date(), "yyyy-MM-dd"),
+        startTime: format(new Date(), "HH:mm"),
         durationHours: 1,
         attendees: "",
         notes: "",
@@ -104,16 +111,19 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
       setSelectedTechs([])
       setChecklist([])
       setSelectedAttendees([])
+      setErrorStatus(null)
     }
   }, [meeting, form, open])
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
+    setErrorStatus(null)
     try {
       const meetingData = {
         title: values.title,
         projectId: values.projectId === "none" ? undefined : values.projectId,
         date: values.date,
+        startTime: values.startTime,
         durationHours: values.durationHours,
         attendees: selectedAttendees.join(", "),
         notes: values.notes || "",
@@ -127,8 +137,9 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
         await addMeeting(meetingData)
       }
       onOpenChange(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      setErrorStatus(error.message || "Ocorreu um erro ao guardar a reunião.")
     } finally {
       setIsLoading(false)
     }
@@ -191,6 +202,13 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
           </DialogDescription>
         </DialogHeader>
 
+
+        {errorStatus && (
+          <Alert variant="destructive" className="py-2 mb-4">
+            <AlertDescription className="text-xs">{errorStatus}</AlertDescription>
+          </Alert>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -248,49 +266,65 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Data</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(new Date(field.value), "PPP", { locale: pt })
-                            ) : (
-                              <span>Escolher data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) =>
-                            field.onChange(date ? format(date, "yyyy-MM-dd") : "")
-                          }
-                          disabled={(date) =>
-                            date > new Date() || date < new Date("1900-01-01")
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4 col-span-2">
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data de Início</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(new Date(field.value), "PPP", { locale: pt })
+                              ) : (
+                                <span>Escolher data</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? new Date(field.value) : undefined}
+                            onSelect={(date) =>
+                              field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                            }
+                            disabled={(date) =>
+                              date > new Date() || date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hora de Início</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -317,12 +351,19 @@ export function MeetingFormDialog({ open, onOpenChange, meeting }: MeetingFormDi
               <FormLabel>Outros Participantes</FormLabel>
               <div className="flex flex-wrap gap-2 min-h-[1.5rem]">
                 {selectedAttendees.map((attendee, index) => (
-                  <Badge key={index} variant="secondary" className="gap-1 px-2 py-0.5 text-[11px]">
+                  <Badge key={index} variant="secondary" className="gap-1 px-2 py-0.5 text-[11px] hover:bg-secondary">
                     {attendee}
-                    <X
-                      className="h-3 w-3 cursor-pointer hover:text-destructive"
-                      onClick={() => removeAttendee(attendee)}
-                    />
+                    <button
+                      type="button"
+                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        removeAttendee(attendee);
+                      }}
+                    >
+                      <X className="h-3 w-3 text-muted-foreground hover:text-destructive transition-colors" />
+                    </button>
                   </Badge>
                 ))}
               </div>

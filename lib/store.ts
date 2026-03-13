@@ -24,6 +24,7 @@ const mapUser = (u: any): User => ({
   id: String(u.id),
   username: u.username,
   name: u.name,
+  color: u.color,
   createdAt: u.created_at,
 })
 
@@ -80,6 +81,7 @@ const mapMeeting = (m: any): Meeting => ({
   projectId: m.project_id ? String(m.project_id) : undefined,
   projectName: m.project_name || "",
   date: m.date,
+  startTime: m.start_time || "09:00",
   durationHours: Number(m.duration_hours || 0),
   technicians: m.technicians || [],
   attendees: m.attendees || "",
@@ -135,6 +137,7 @@ const meetingToApi = (m: Partial<Meeting>) => ({
   ...(m.title !== undefined && { title: m.title }),
   ...(m.projectId !== undefined && { projectId: m.projectId }),
   ...(m.date !== undefined && { date: m.date }),
+  ...(m.startTime !== undefined && { startTime: m.startTime }),
   ...(m.durationHours !== undefined && { durationHours: m.durationHours }),
   ...(m.technicians !== undefined && { technicians: m.technicians }),
   ...(m.attendees !== undefined && { attendees: m.attendees }),
@@ -486,9 +489,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(meetingToApi(meetingData)),
     })
-    if (!res.ok) throw new Error("Erro ao criar reunião")
-    const newRaw = await res.json()
-    const newMeeting = mapMeeting(newRaw)
+    const resData = await res.json()
+    if (!res.ok) {
+      throw new Error(resData.error || "Erro ao criar reunião")
+    }
+    const newMeeting = mapMeeting(resData)
 
     set((state) => ({ meetings: [...state.meetings, newMeeting] }))
     if (meetingData.projectId) {
@@ -501,11 +506,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const meeting = get().meetings.find((m) => m.id === id)
     if (!meeting) return
 
-    await fetch(`${API_URL}/meetings/${id}`, {
+    const res = await fetch(`${API_URL}/meetings/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(meetingToApi(updates)),
     })
+    
+    if (!res.ok) {
+      const errData = await res.json()
+      throw new Error(errData.error || "Erro ao atualizar reunião")
+    }
 
     let projectName = meeting.projectName
     if (updates.projectId && updates.projectId !== meeting.projectId) {

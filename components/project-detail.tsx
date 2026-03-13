@@ -11,6 +11,7 @@ import {
   calculateProjectProgress,
   type Project,
   type Task,
+  type Meeting,
 } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { TaskFormDialog } from "@/components/task-form-dialog"
+import { MeetingFormDialog } from "@/components/meeting-form-dialog"
 import {
   ArrowLeft,
   Calendar,
@@ -44,6 +46,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Users,
 } from "lucide-react"
 
 interface ProjectDetailProps {
@@ -51,15 +54,22 @@ interface ProjectDetailProps {
 }
 
 export function ProjectDetail({ project }: ProjectDetailProps) {
+  const users = useProjectStore((state) => state.users)
   // useShallow garante comparação estável — evita o loop infinito
   const tasks = useProjectStore(
     useShallow((state) => state.tasks.filter((t) => t.projectId === project.id))
   )
+  const meetings = useProjectStore(
+    useShallow((state) => state.meetings.filter((m) => m.projectId === project.id))
+  )
   const deleteTask = useProjectStore((state) => state.deleteTask)
+  const deleteMeeting = useProjectStore((state) => state.deleteMeeting)
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
+  const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false)
+  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null)
   const progress = calculateProjectProgress(project)
 
   // Calculate hours from tasks
@@ -83,6 +93,24 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
     setIsTaskDialogOpen(open)
     if (!open) {
       setEditingTask(null)
+    }
+  }
+
+  const handleEditMeeting = (m: Meeting) => {
+    setEditingMeeting(m)
+    setIsMeetingDialogOpen(true)
+  }
+
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (confirm("Tem certeza que deseja eliminar esta reunião?")) {
+      await deleteMeeting(meetingId)
+    }
+  }
+
+  const handleMeetingDialogClose = (open: boolean) => {
+    setIsMeetingDialogOpen(open)
+    if (!open) {
+      setEditingMeeting(null)
     }
   }
 
@@ -221,7 +249,28 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">{phase.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{phase.technician}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {(() => {
+                          const user = users.find(u => u.name === phase.technician);
+                          return user ? (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 font-normal"
+                              style={{
+                                borderColor: user.color,
+                                backgroundColor: `${user.color}15`,
+                                color: user.color
+                              }}
+                            >
+                              {phase.technician}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">{phase.technician}</span>
+                          );
+                        })()}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-center text-sm">
                       {formatDate(phase.plannedStartDate)}
                     </TableCell>
@@ -404,6 +453,94 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
         open={isTaskDialogOpen}
         onOpenChange={handleTaskDialogClose}
         editTask={editingTask}
+        defaultProjectId={project.id}
+      />
+
+      {/* Meetings Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span>Reuniões do Projeto</span>
+              <Badge variant="secondary">{meetings.length} reuniões</Badge>
+            </div>
+            <Button size="sm" onClick={() => setIsMeetingDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Reunião
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {meetings.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Hora</TableHead>
+                  <TableHead className="text-center">Duração</TableHead>
+                  <TableHead>Técnicos</TableHead>
+                  <TableHead className="w-10"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {meetings.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">
+                      <Link href={`/reunioes/${m.id}`} className="hover:underline hover:text-primary">
+                        {m.title}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{formatDate(m.date)}</TableCell>
+                    <TableCell>{m.startTime}</TableCell>
+                    <TableCell className="text-center">{m.durationHours}h</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {m.technicians.map(t => (
+                          <Badge key={t} variant="outline" className="text-[10px] font-normal px-1">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditMeeting(m)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteMeeting(m.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>Este projeto ainda não tem reuniões associadas.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <MeetingFormDialog
+        open={isMeetingDialogOpen}
+        onOpenChange={handleMeetingDialogClose}
+        meeting={editingMeeting || undefined}
         defaultProjectId={project.id}
       />
     </div>

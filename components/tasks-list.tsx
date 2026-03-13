@@ -45,10 +45,16 @@ import {
   Trash2,
   CalendarDays,
   X,
+  CalendarIcon,
 } from "lucide-react"
+import { format } from "date-fns"
+import { pt } from "date-fns/locale"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
 
 export function TasksList() {
   const tasks = useProjectStore((state) => state.tasks)
+  const users = useProjectStore((state) => state.users)
   const deleteTask = useProjectStore((state) => state.deleteTask)
 
   const [searchQuery, setSearchQuery] = useState("")
@@ -275,31 +281,73 @@ export function TasksList() {
                   </p>
                 </div>
                 <div className="grid gap-3">
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex flex-col">
                     <Label htmlFor="task-start-date" className="text-xs">
                       Data Início
                     </Label>
-                    <Input
-                      id="task-start-date"
-                      type="date"
-                      value={dateRange.start}
-                      onChange={(e) =>
-                        setDateRange((prev) => ({ ...prev, start: e.target.value }))
-                      }
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          size="sm"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !dateRange.start && "text-muted-foreground"
+                          )}
+                        >
+                          {dateRange.start ? (
+                            format(new Date(dateRange.start), "dd/MM/yy")
+                          ) : (
+                            <span>Data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dateRange.start ? new Date(dateRange.start) : undefined}
+                          onSelect={(date) =>
+                            setDateRange((prev) => ({ ...prev, start: date ? format(date, "yyyy-MM-dd") : "" }))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex flex-col">
                     <Label htmlFor="task-end-date" className="text-xs">
                       Data Fim
                     </Label>
-                    <Input
-                      id="task-end-date"
-                      type="date"
-                      value={dateRange.end}
-                      onChange={(e) =>
-                        setDateRange((prev) => ({ ...prev, end: e.target.value }))
-                      }
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          size="sm"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !dateRange.end && "text-muted-foreground"
+                          )}
+                        >
+                          {dateRange.end ? (
+                            format(new Date(dateRange.end), "dd/MM/yy")
+                          ) : (
+                            <span>Data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dateRange.end ? new Date(dateRange.end) : undefined}
+                          onSelect={(date) =>
+                            setDateRange((prev) => ({ ...prev, end: date ? format(date, "yyyy-MM-dd") : "" }))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
                 {hasDateFilter && (
@@ -431,8 +479,27 @@ export function TasksList() {
                             <TableCell className="text-muted-foreground">
                               {task.ticket || "-"}
                             </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {task.technician}
+                            <TableCell>
+                              {task.technician && (
+                                <div className="flex items-center gap-1.5">
+                                  {(() => {
+                                    const user = users.find(u => u.name === task.technician);
+                                    return (
+                                      <Badge 
+                                        variant="outline" 
+                                        className="text-[10px] px-1.5 py-0 font-normal"
+                                        style={{ 
+                                          borderColor: user?.color,
+                                          backgroundColor: user?.color ? `${user.color}15` : undefined,
+                                          color: user?.color
+                                        }}
+                                      >
+                                        {task.technician}
+                                      </Badge>
+                                    );
+                                  })()}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell className="text-muted-foreground max-w-[120px] truncate">
                               {task.requester}

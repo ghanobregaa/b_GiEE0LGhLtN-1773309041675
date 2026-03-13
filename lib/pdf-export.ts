@@ -9,8 +9,8 @@ export const exportMeetingToPDF = (meeting: Meeting) => {
   // Header
   doc.setFontSize(22)
   doc.setTextColor(41, 128, 185)
-  doc.text("Project Sync - Acta de Reunião", 20, 20)
-  
+  doc.text("AFADev - Acta de Reunião", 20, 20)
+
   doc.setLineWidth(0.5)
   doc.line(20, 25, pageWidth - 20, 25)
 
@@ -30,7 +30,7 @@ export const exportMeetingToPDF = (meeting: Meeting) => {
   doc.setFontSize(11)
   doc.setTextColor(33, 33, 33)
   doc.text("Participantes:", 20, 65)
-  
+
   doc.setFontSize(10)
   doc.setTextColor(60, 60, 60)
   const techsText = meeting.technicians.join(", ")
@@ -52,7 +52,7 @@ export const exportMeetingToPDF = (meeting: Meeting) => {
       doc.setTextColor(item.checked ? 100 : 60)
       doc.text(`${checkboxText} ${item.text}`, 25, currentY)
       currentY += 6
-      
+
       if (currentY > 270) {
         doc.addPage()
         currentY = 20
@@ -72,20 +72,20 @@ export const exportMeetingToPDF = (meeting: Meeting) => {
     doc.setTextColor(60, 60, 60)
     const splitNotes = doc.splitTextToSize(meeting.notes, pageWidth - 40)
     doc.text(splitNotes, 20, currentY)
-    
+
     currentY += (splitNotes.length * 6) + 10
   }
 
   // Footer
   const pageCount = (doc.internal as any).getNumberOfPages()
-  for(let i = 1; i <= pageCount; i++) {
+  for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
     doc.setFontSize(8)
     doc.setTextColor(150, 150, 150)
     doc.text(
-      `Página ${i} de ${pageCount} | Gerado por Project Sync em ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 
-      pageWidth / 2, 
-      doc.internal.pageSize.getHeight() - 10, 
+      `Página ${i} de ${pageCount} | Gerado por AFADev em ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
+      pageWidth / 2,
+      doc.internal.pageSize.getHeight() - 10,
       { align: "center" }
     )
   }

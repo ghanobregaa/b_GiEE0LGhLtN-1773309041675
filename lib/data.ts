@@ -6,6 +6,7 @@ export interface User {
   id: string
   username: string
   name: string
+  color?: string
   createdAt: string
 }
 
@@ -21,6 +22,7 @@ export interface Meeting {
   projectId?: string
   projectName?: string
   date: string
+  startTime: string
   durationHours: number
   technicians: string[]
   attendees: string
