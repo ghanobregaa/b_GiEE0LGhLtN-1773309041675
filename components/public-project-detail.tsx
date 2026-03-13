@@ -141,7 +141,7 @@ export function PublicProjectDetail({ project }: PublicProjectDetailProps) {
         </h2>
         <Card className="overflow-hidden border-none shadow-lg">
           <CardContent className="p-0">
-            <GanttChart projects={[project]} />
+            <GanttChart projects={[project]} isReadOnly />
           </CardContent>
         </Card>
       </div>

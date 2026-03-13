@@ -613,8 +613,10 @@ export function calculateProjectProgress(project: Project): number {
   return Math.round((project.actualHours / project.plannedHours) * 100)
 }
 
-export function formatDate(dateString: string): string {
+export function formatDate(dateString?: string | null): string {
+  if (!dateString) return "-"
   const date = new Date(dateString)
+  if (isNaN(date.getTime())) return "-"
   return date.toLocaleDateString("pt-PT", {
     day: "2-digit",
     month: "2-digit",

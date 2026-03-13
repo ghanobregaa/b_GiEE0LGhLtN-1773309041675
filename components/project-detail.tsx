@@ -144,11 +144,9 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
     }
   }
 
-  const handleCopyLink = () => {
+  const handleOpenPublicPage = () => {
     const url = `${window.location.origin}/public/projeto/${project.id}`
-    navigator.clipboard.writeText(url)
-    // Usamos um alert simples para feedback imediato
-    alert("Link público copiado com sucesso!")
+    window.open(url, "_blank")
   }
 
   return (
@@ -173,9 +171,9 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
           </div>
           <p className="text-muted-foreground">{project.description}</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyLink}>
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleOpenPublicPage}>
           <Share2 className="h-4 w-4" />
-          Copiar Link para Cliente
+          Abrir Página do Cliente
         </Button>
       </div>
 

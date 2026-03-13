@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useProjectStore, type Project, getPhaseColor } from "@/lib/store"
+import { useProjectStore, type Project, getPhaseColor, formatDate } from "@/lib/store"
 import {
   Tooltip,
   TooltipContent,
@@ -10,9 +10,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ChevronRight, ChevronDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface GanttChartProps {
   projects: Project[]
+  isReadOnly?: boolean
 }
 
 // Returns start of month (day 1, 00:00:00)
@@ -25,7 +27,7 @@ function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0)
 }
 
-export function GanttChart({ projects }: GanttChartProps) {
+export function GanttChart({ projects, isReadOnly = false }: GanttChartProps) {
   const { users } = useProjectStore()
   const today = useMemo(() => new Date(), [])
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
@@ -178,12 +180,18 @@ export function GanttChart({ projects }: GanttChartProps) {
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
                       </button>
-                      <Link
-                        href={`/projetos/${project.id}`}
-                        className="font-semibold text-sm hover:text-primary hover:underline truncate block flex-1"
-                      >
-                        {project.name}
-                      </Link>
+                      {isReadOnly ? (
+                        <span className="font-semibold text-sm truncate block flex-1">
+                          {project.name}
+                        </span>
+                      ) : (
+                        <Link
+                          href={`/projetos/${project.id}`}
+                          className="font-semibold text-sm hover:text-primary hover:underline truncate block flex-1"
+                        >
+                          {project.name}
+                        </Link>
+                      )}
                     </div>
                     <div className="flex-1 relative h-6">
                       {/* Month background bands */}
@@ -235,19 +243,19 @@ export function GanttChart({ projects }: GanttChartProps) {
                     return (
                       <div
                         key={phase.id}
-                        className="flex items-center hover:bg-muted/20 rounded h-7"
+                        className="flex items-center hover:bg-muted/30 rounded h-12 border-b border-border/10 last:border-0"
                       >
-                        <div className="w-52 shrink-0 px-2 pl-7">
-                          <span className="text-xs text-muted-foreground truncate block">
+                        <div className="w-52 shrink-0 px-2 pl-7 flex items-center">
+                          <span className="text-[11px] font-semibold text-muted-foreground truncate block">
                             {phase.name}
                           </span>
                         </div>
-                        <div className="flex-1 relative h-5">
-                          {/* Month bands */}
+                        <div className="flex-1 relative h-10 flex items-center">
+                          {/* Month bands background */}
                           {months.map((m, i) => (
                             <div
                               key={i}
-                              className={`absolute inset-y-0 ${i === 1 ? "bg-primary/5" : ""}`}
+                              className={`absolute inset-y-0 ${i === 1 ? "bg-primary/5" : "border-l border-border/10"}`}
                               style={{
                                 left:  `${(m.startOffset / totalDays) * 100}%`,
                                 width: `${(m.days / totalDays) * 100}%`,
@@ -255,75 +263,102 @@ export function GanttChart({ projects }: GanttChartProps) {
                             />
                           ))}
 
-                          {/* Planned bar */}
-                          {plannedBar && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div
-                                  className={`absolute h-3 top-1 rounded-sm cursor-pointer opacity-80 hover:opacity-100 transition-opacity ${getPhaseColor(phase.type)}`}
-                                  style={plannedBar}
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                <div className="text-xs space-y-0.5">
-                                  <p className="font-semibold">{phase.name}</p>
-                                  <p className="text-muted-foreground">{phase.type}</p>
-                                  <p>Previsto: {phase.plannedHours}h</p>
-                                  <p>
-                                    {new Date(phase.plannedStartDate).toLocaleDateString("pt-PT")}
-                                    {" → "}
-                                    {new Date(phase.plannedEndDate).toLocaleDateString("pt-PT")}
-                                  </p>
-                                  <p>
-                                    Técnicos: {phase.technicianIds?.map(tid => users.find(u => u.id === tid)?.name || tid).join(", ") || "Nenhum"}
-                                  </p>
-                                  {phase.actualStartDate && (
-                                    <p className="border-t pt-0.5 mt-0.5">
-                                      Real: {phase.actualHours || 0}h
-                                    </p>
-                                  )}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-
-                          {/* Delayed Start Indicator Line */}
-                          {phase.actualStartDate && phase.actualStartDate > phase.plannedEndDate && (() => {
-                            const plannedEndOffset = getDateOffset(phase.plannedEndDate);
-                            const actualStartOffset = getDateOffset(phase.actualStartDate);
+                          {/* ── Unified Progress Bar ────────────────── */}
+                          <div className="relative w-full h-6 flex items-center">
                             
-                            // Only draw if within window
-                            if (plannedEndOffset < totalDays * 100 && actualStartOffset > 0) {
-                              return (
-                                <div 
-                                  className="absolute h-px border-t border-dashed border-red-400 top-2.5 z-10"
-                                  style={{
-                                    left: `${Math.max(0, plannedEndOffset)}%`,
-                                    width: `${Math.min(100, actualStartOffset) - Math.max(0, plannedEndOffset)}%`
-                                  }}
-                                />
-                              );
-                            }
-                            return null;
-                          })()}
+                            {/* 1. Planned Interval (The "Goal" or Container) */}
+                            {plannedBar && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div 
+                                    className={cn(
+                                      "absolute h-5 rounded-md opacity-20 border border-current z-0",
+                                      getPhaseColor(phase.type).replace("bg-", "text-").replace("border-", "border-")
+                                    )}
+                                    style={{
+                                      ...plannedBar,
+                                      backgroundColor: 'currentColor'
+                                    }}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <div className="text-xs p-1">
+                                    <p className="font-bold">{phase.name} (Planeado)</p>
+                                    <p>{formatDate(phase.plannedStartDate)} → {formatDate(phase.plannedEndDate)}</p>
+                                    <p className="pt-1 text-primary font-bold">Esforço: {phase.plannedHours}h</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
 
-                          {/* Actual bar */}
-                          {actualBar && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div
-                                  className={`absolute h-1.5 top-[14px] rounded-sm cursor-pointer ${getPhaseColor(phase.type)} ring-1 ring-white/80`}
-                                  style={actualBar}
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <div className="text-xs">
-                                  <p className="font-semibold">{phase.name} — Real</p>
-                                  <p>Horas realizadas: {phase.actualHours || 0}h</p>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
+                            {/* 2. Actual Progress (The "Fill") */}
+                            {actualBar && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className={cn(
+                                      "absolute h-5 rounded-md shadow-sm z-10 border border-white/20 flex items-center overflow-hidden",
+                                      getPhaseColor(phase.type)
+                                    )}
+                                    style={actualBar}
+                                  >
+                                    {/* Glass reflection effect */}
+                                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+                                    {/* Progress "pulse" if in progress */}
+                                    {(!phase.actualEndDate) && (
+                                      <div className="absolute inset-0 bg-white/10 animate-pulse duration-[2000ms]" />
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <div className="text-xs p-1">
+                                    <p className="font-bold text-sm">{phase.name} (Real)</p>
+                                    <p>Horas: <span className="font-bold">{phase.actualHours || 0}h</span></p>
+                                    <p className="text-[10px] opacity-70">
+                                      {formatDate(phase.actualStartDate)}
+                                      {phase.actualEndDate ? ` → ${formatDate(phase.actualEndDate)}` : " (Em curso)"}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {/* 3. Delayed Indicator (Red Line) */}
+                            {phase.actualStartDate && phase.actualStartDate > phase.plannedEndDate && (() => {
+                              const plannedEndOffset = getDateOffset(phase.plannedEndDate);
+                              const actualStartOffset = getDateOffset(phase.actualStartDate);
+                              if (plannedEndOffset < 100 && actualStartOffset > 0) {
+                                return (
+                                  <div 
+                                    className="absolute h-[2px] border-t-2 border-dashed border-red-500/80 z-0"
+                                    style={{
+                                      left: `${Math.max(0, plannedEndOffset)}%`,
+                                      width: `${Math.min(100, actualStartOffset) - Math.max(0, plannedEndOffset)}%`
+                                    }}
+                                  />
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            {/* 4. Early Indicator (Green Line) */}
+                            {phase.actualEndDate && phase.actualEndDate < phase.plannedEndDate && (() => {
+                              const actualEndOffset = getDateOffset(phase.actualEndDate);
+                              const plannedEndOffset = getDateOffset(phase.plannedEndDate);
+                              if (actualEndOffset < 100 && plannedEndOffset > 0) {
+                                return (
+                                  <div 
+                                    className="absolute h-[2px] border-t-2 border-dashed border-emerald-500/80 z-0"
+                                    style={{
+                                      left: `${Math.max(0, actualEndOffset)}%`,
+                                      width: `${Math.min(100, plannedEndOffset) - Math.max(0, actualEndOffset)}%`
+                                    }}
+                                  />
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         </div>
                       </div>
                     )
