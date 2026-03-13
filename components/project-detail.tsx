@@ -12,7 +12,9 @@ import {
   type Project,
   type Task,
   type Meeting,
+  type Phase,
 } from "@/lib/store"
+import { PhaseFormDialog } from "@/components/phase-form-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -48,6 +50,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/lib/auth-store"
 
 interface ProjectDetailProps {
@@ -68,6 +71,10 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
   )
   const deleteTask = useProjectStore((state) => state.deleteTask)
   const deleteMeeting = useProjectStore((state) => state.deleteMeeting)
+  const deletePhase = useProjectStore((state) => state.deletePhase)
+
+  const [isPhaseDialogOpen, setIsPhaseDialogOpen] = useState(false)
+  const [editingPhase, setEditingPhase] = useState<Phase | null>(null)
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -118,6 +125,24 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
     }
   }
 
+  const handleEditPhase = (phase: Phase) => {
+    setEditingPhase(phase)
+    setIsPhaseDialogOpen(true)
+  }
+
+  const handleDeletePhase = async (phaseId: string) => {
+    if (confirm("Tem certeza que deseja eliminar esta fase?")) {
+      await deletePhase(project.id, phaseId)
+    }
+  }
+
+  const handlePhaseDialogClose = (open: boolean) => {
+    setIsPhaseDialogOpen(open)
+    if (!open) {
+      setEditingPhase(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -131,10 +156,10 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
           </Link>
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-            <Badge variant="outline" className={project.company === "SAVOY" ? "border-blue-200 text-blue-700 bg-blue-50" : "border-amber-200 text-amber-700 bg-amber-50"}>
+            <Badge variant="outline" className={project.company === "SAVOY" ? "border-blue-500/30 text-blue-500 bg-blue-500/10" : "border-amber-500/30 text-amber-500 bg-amber-500/10"}>
               {project.company}
             </Badge>
-            <Badge variant="secondary" className={getStatusColor(project.status)}>
+            <Badge variant="secondary" className={cn("font-semibold", getStatusColor(project.status))}>
               {project.status}
             </Badge>
           </div>
@@ -208,9 +233,17 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
       {/* Phases Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Fases do Projeto
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Fases do Projeto
+            </div>
+            {!isVisitor && (
+              <Button size="sm" onClick={() => setIsPhaseDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Fase
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -227,6 +260,7 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                 <TableHead className="text-center">Data Fim</TableHead>
                 <TableHead className="text-center">Horas</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
               <TableRow className="bg-muted/50">
                 <TableHead colSpan={3}></TableHead>
@@ -236,6 +270,7 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                 <TableHead colSpan={3} className="text-center text-xs font-normal">
                   Real
                 </TableHead>
+                <TableHead></TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -254,26 +289,28 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                     </TableCell>
                     <TableCell className="font-medium">{phase.name}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {(() => {
-                          const user = users.find(u => u.id === phase.technicianId);
-                          const name = user?.name || phase.technicianId || "Sem Técnico";
-                          return user ? (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 font-normal"
-                              style={{
-                                borderColor: user.color,
-                                backgroundColor: `${user.color}15`,
-                                color: user.color
-                              }}
-                            >
-                              {name}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">{name}</span>
-                          );
-                        })()}
+                      <div className="flex flex-wrap gap-1">
+                        {phase.technicianIds && phase.technicianIds.length > 0 ? (
+                          phase.technicianIds.map((tid) => {
+                            const user = users.find((u) => u.id === tid)
+                            return (
+                              <Badge
+                                key={tid}
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 font-normal"
+                                style={user ? {
+                                  borderColor: user.color,
+                                  backgroundColor: `${user.color}15`,
+                                  color: user.color
+                                } : {}}
+                              >
+                                {user?.name || tid}
+                              </Badge>
+                            )
+                          })
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">Sem técnicos</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center text-sm">
@@ -307,6 +344,31 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                           <span className="text-xs">Pendente</span>
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Ações</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditPhase(phase)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          {!isVisitor && (
+                            <DropdownMenuItem
+                              onClick={() => handleDeletePhase(phase.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )
@@ -583,6 +645,13 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
         onOpenChange={handleMeetingDialogClose}
         meeting={editingMeeting || undefined}
         defaultProjectId={project.id}
+      />
+
+      <PhaseFormDialog
+        open={isPhaseDialogOpen}
+        onOpenChange={handlePhaseDialogClose}
+        projectId={project.id}
+        editPhase={editingPhase}
       />
     </div>
   )
