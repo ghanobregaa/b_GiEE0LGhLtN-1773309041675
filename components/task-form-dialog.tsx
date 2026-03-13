@@ -19,7 +19,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 import { CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, calculateBusinessHours } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -307,9 +307,15 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
                     <Calendar
                       mode="single"
                       selected={formData.plannedStartDate ? new Date(formData.plannedStartDate) : undefined}
-                      onSelect={(date) =>
-                        setFormData({ ...formData, plannedStartDate: date ? format(date, "yyyy-MM-dd") : "" })
-                      }
+                      onSelect={(date) => {
+                        const newStart = date ? format(date, "yyyy-MM-dd") : ""
+                        const hours = calculateBusinessHours(newStart, formData.plannedEndDate)
+                        setFormData({
+                          ...formData,
+                          plannedStartDate: newStart,
+                          plannedHours: hours > 0 ? hours : formData.plannedHours
+                        })
+                      }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -339,9 +345,15 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
                     <Calendar
                       mode="single"
                       selected={formData.plannedEndDate ? new Date(formData.plannedEndDate) : undefined}
-                      onSelect={(date) =>
-                        setFormData({ ...formData, plannedEndDate: date ? format(date, "yyyy-MM-dd") : "" })
-                      }
+                      onSelect={(date) => {
+                        const newEnd = date ? format(date, "yyyy-MM-dd") : ""
+                        const hours = calculateBusinessHours(formData.plannedStartDate, newEnd)
+                        setFormData({
+                          ...formData,
+                          plannedEndDate: newEnd,
+                          plannedHours: hours > 0 ? hours : formData.plannedHours
+                        })
+                      }}
                       initialFocus
                     />
                   </PopoverContent>

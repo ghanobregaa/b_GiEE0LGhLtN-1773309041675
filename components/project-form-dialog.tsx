@@ -30,7 +30,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 import { CalendarIcon, Plus, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, calculateBusinessHours } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -128,7 +128,25 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
 
   const updatePhase = (index: number, field: keyof PhaseInput, value: any) => {
     setPhases(
-      phases.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+      phases.map((p, i) => {
+        if (i === index) {
+          const updatedPhase = { ...p, [field]: value }
+          
+          // Auto-calculate hours if dates changed
+          if (field === "plannedStartDate" || field === "plannedEndDate") {
+            const hours = calculateBusinessHours(
+              updatedPhase.plannedStartDate,
+              updatedPhase.plannedEndDate
+            )
+            if (hours > 0) {
+              updatedPhase.plannedHours = hours
+            }
+          }
+          
+          return updatedPhase
+        }
+        return p
+      })
     )
   }
 
