@@ -47,9 +47,12 @@ import { useProjectStore } from "@/lib/store"
 import { Meeting, formatDate } from "@/lib/data"
 import { MeetingFormDialog } from "./meeting-form-dialog"
 import { exportMeetingToPDF } from "@/lib/pdf-export"
+import { useAuthStore } from "@/lib/auth-store"
 
 export function MeetingsList() {
   const { meetings, projects, deleteMeeting, users } = useProjectStore()
+  const currentUser = useAuthStore((state) => state.user)
+  const isVisitor = currentUser?.role === "visitante"
   const [searchTerm, setSearchTerm] = useState("")
   const [projectFilter, setProjectFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -147,10 +150,12 @@ export function MeetingsList() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleCreateNew} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nova Reunião
-        </Button>
+        {!isVisitor && (
+          <Button onClick={handleCreateNew} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nova Reunião
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -243,13 +248,15 @@ export function MeetingsList() {
                               <Pencil className="h-4 w-4" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDelete(meeting.id)} 
-                              className="gap-2 text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Eliminar
-                            </DropdownMenuItem>
+                            {!isVisitor && (
+                              <DropdownMenuItem 
+                                onClick={() => handleDelete(meeting.id)} 
+                                className="gap-2 text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

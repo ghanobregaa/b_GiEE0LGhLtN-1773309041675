@@ -2,11 +2,14 @@ export type ProjectStatus = "Novo" | "Em curso" | "Concluído" | "Suspenso"
 export type TaskStatus = "Pendente" | "Em curso" | "Concluído"
 export type PhaseType = "Requisitos" | "Desenvolvimento" | "Testes" | "Documentação"
 
+export type UserRole = "técnico" | "visitante"
+
 export interface User {
   id: string
   username: string
   name: string
   color?: string
+  role?: UserRole
   createdAt: string
 }
 

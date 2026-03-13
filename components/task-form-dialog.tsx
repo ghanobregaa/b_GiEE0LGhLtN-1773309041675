@@ -253,7 +253,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
                   <SelectValue placeholder="Selecione um técnico" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((user) => (
+                  {users.filter(u => u.role === "técnico").map((user) => (
                     <SelectItem key={user.id} value={user.name}>
                       <div className="flex items-center gap-2">
                         <div 

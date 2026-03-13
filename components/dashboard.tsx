@@ -152,7 +152,12 @@ export function Dashboard() {
       })
     })
 
-    const techData = Object.values(techniciansMap).sort((a, b) => b.hours - a.hours)
+    const techData = Object.values(techniciansMap)
+      .filter(t => {
+        const user = users.find(u => u.name === t.name)
+        return user?.role === "técnico"
+      })
+      .sort((a, b) => b.hours - a.hours)
 
     // Task status distribution
     const statusData = [
@@ -454,7 +459,12 @@ export function Dashboard() {
                       style={{ backgroundColor: tech.color || "#ccc" }}
                     />
                     <div>
-                      <p className="font-medium">{tech.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{tech.name}</p>
+                        <Badge variant="outline" className="text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50 h-4 px-1">
+                          DEV
+                        </Badge>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {tech.tasks} tarefas | {tech.meetings} reuniões
                       </p>

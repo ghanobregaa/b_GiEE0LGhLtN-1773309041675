@@ -330,7 +330,7 @@ export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectI
             <div className="space-y-2">
               <FormLabel>Técnicos Presentes</FormLabel>
               <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/20">
-                {users.map((user) => (
+                {users.filter(u => u.role === "técnico").map((user) => (
                   <div
                     key={user.id}
                     onClick={() => toggleTech(user.name)}

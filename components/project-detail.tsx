@@ -48,6 +48,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react"
+import { useAuthStore } from "@/lib/auth-store"
 
 interface ProjectDetailProps {
   project: Project
@@ -55,6 +56,9 @@ interface ProjectDetailProps {
 
 export function ProjectDetail({ project }: ProjectDetailProps) {
   const users = useProjectStore((state) => state.users)
+  const currentUser = useAuthStore((state) => state.user)
+  const isVisitor = currentUser?.role === "visitante"
+
   // useShallow garante comparação estável — evita o loop infinito
   const tasks = useProjectStore(
     useShallow((state) => state.tasks.filter((t) => t.projectId === project.id))
@@ -364,10 +368,12 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
               <span>Tarefas do Projeto</span>
               <Badge variant="secondary">{tasks.length} tarefas</Badge>
             </div>
-            <Button size="sm" onClick={() => setIsTaskDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Tarefa
-            </Button>
+            {!isVisitor && (
+              <Button size="sm" onClick={() => setIsTaskDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Tarefa
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -419,13 +425,15 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                               <Pencil className="h-4 w-4 mr-2" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
+                            {!isVisitor && (
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteTask(task.id)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -439,10 +447,12 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
               <p className="text-muted-foreground mb-4">
                 Este projeto ainda não tem tarefas associadas.
               </p>
-              <Button onClick={() => setIsTaskDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Primeira Tarefa
-              </Button>
+              {!isVisitor && (
+                <Button onClick={() => setIsTaskDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Criar Primeira Tarefa
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -464,10 +474,12 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
               <span>Reuniões do Projeto</span>
               <Badge variant="secondary">{meetings.length} reuniões</Badge>
             </div>
-            <Button size="sm" onClick={() => setIsMeetingDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Reunião
-            </Button>
+            {!isVisitor && (
+              <Button size="sm" onClick={() => setIsMeetingDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Reunião
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -515,13 +527,15 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                             <Pencil className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteMeeting(m.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
+                          {!isVisitor && (
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteMeeting(m.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

@@ -76,7 +76,14 @@ export function AppSidebar() {
             <User className="h-4 w-4 text-primary" />
           </div>
           <div className="flex flex-col truncate">
-            <span className="text-sm font-medium truncate">{user?.name || user?.username}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium truncate">{user?.name || user?.username}</span>
+              {user?.role === "técnico" && (
+                <span className="text-[10px] font-bold px-1 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  DEV
+                </span>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground truncate">@{user?.username}</span>
           </div>
         </div>

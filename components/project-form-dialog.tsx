@@ -391,7 +391,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((user) => (
+                          {users.filter(u => u.role === "técnico").map((user) => (
                             <SelectItem key={user.id} value={user.name}>
                               <div className="flex items-center gap-2">
                                 <div 

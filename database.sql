@@ -88,6 +88,10 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 ALTER TABLE projects
   ADD COLUMN IF NOT EXISTS company company_name NOT NULL DEFAULT 'SAVOY';
 
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('técnico', 'visitante');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- ─── Tabela USERS ───────────────────────────────────────────
 -- Simplificado para apenas uma password de sistema
 CREATE TABLE IF NOT EXISTS users (
@@ -96,6 +100,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     name TEXT DEFAULT 'Utilizador',
     color TEXT DEFAULT '#6366f1',
+    role user_role DEFAULT 'técnico',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -36,6 +36,7 @@ import {
   Users,
   Clock,
   Plus,
+  Lock,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -44,10 +45,13 @@ import {
   FileDown,
 } from "lucide-react"
 import { getApiUrl } from "@/lib/api-config"
+import { useAuthStore } from "@/lib/auth-store"
 
 export function ProjectsList() {
   const projects = useProjectStore((state) => state.projects)
   const deleteProject = useProjectStore((state) => state.deleteProject)
+  const user = useAuthStore((state) => state.user)
+  const isVisitor = user?.role === "visitante"
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [selectedCompany, setSelectedCompany] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -124,10 +128,12 @@ export function ProjectsList() {
             {isExporting ? "A exportar..." : "Exportar Excel"}
           </Button>
           <div className="w-[1px] h-8 bg-border mx-2" />
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Projeto
-          </Button>
+          {!isVisitor && (
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Projeto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -256,6 +262,7 @@ export function ProjectsList() {
                       project={project}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      isVisitor={isVisitor}
                     />
                   ))}
                   {filteredProjects.length === 0 && (
@@ -297,9 +304,10 @@ interface ProjectRowProps {
   project: Project
   onEdit: (project: Project) => void
   onDelete: (projectId: string) => void
+  isVisitor?: boolean
 }
 
-function ProjectRow({ project, onEdit, onDelete }: ProjectRowProps) {
+function ProjectRow({ project, onEdit, onDelete, isVisitor }: ProjectRowProps) {
   const progress = calculateProjectProgress(project)
 
   return (
@@ -371,14 +379,18 @@ function ProjectRow({ project, onEdit, onDelete }: ProjectRowProps) {
                 Ver Detalhes
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(project)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDelete(project.id)} className="text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Eliminar
-            </DropdownMenuItem>
+            {!isVisitor && (
+              <>
+                <DropdownMenuItem onClick={() => onEdit(project)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(project.id)} className="text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

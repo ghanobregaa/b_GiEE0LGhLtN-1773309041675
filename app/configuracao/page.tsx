@@ -10,7 +10,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Trash2, UserPlus, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-import { type User } from "@/lib/data"
+import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { type User, type UserRole } from "@/lib/data"
 
 export default function ConfiguracaoPage() {
   const users = useProjectStore((state) => state.users)
@@ -22,6 +30,7 @@ export default function ConfiguracaoPage() {
   const [newPassword, setNewPassword] = useState("")
   const [newName, setNewName] = useState("")
   const [newColor, setNewColor] = useState("#6366f1")
+  const [newRole, setNewRole] = useState<UserRole>("técnico")
   const [editingUser, setEditingUser] = useState<User | null>(null)
 
   useEffect(() => {
@@ -38,7 +47,8 @@ export default function ConfiguracaoPage() {
           username: newUsername,
           password: newPassword,
           name: newName,
-          color: newColor
+          color: newColor,
+          role: newRole
         }),
       })
       if (!res.ok) throw new Error("Erro ao criar utilizador")
@@ -61,6 +71,7 @@ export default function ConfiguracaoPage() {
           username: newUsername,
           name: newName,
           color: newColor,
+          role: newRole,
           ...(newPassword ? { password: newPassword } : {})
         }),
       })
@@ -78,6 +89,7 @@ export default function ConfiguracaoPage() {
     setNewPassword("")
     setNewName("")
     setNewColor("#6366f1")
+    setNewRole("técnico")
     setEditingUser(null)
     setError(null)
   }
@@ -87,6 +99,7 @@ export default function ConfiguracaoPage() {
     setNewUsername(user.username)
     setNewName(user.name)
     setNewColor(user.color || "#6366f1")
+    setNewRole(user.role || "técnico")
     setNewPassword("")
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -152,7 +165,20 @@ export default function ConfiguracaoPage() {
                   required={!editingUser}
                 />
               </div>
-              
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium mb-1">Perfil / Cargo</p>
+                <Select value={newRole} onValueChange={(v: UserRole) => setNewRole(v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione um perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="técnico">Técnico (Aparece nos selects)</SelectItem>
+                    <SelectItem value="visitante">Visitante (Apenas leitura)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+             
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <div 
@@ -204,6 +230,7 @@ export default function ConfiguracaoPage() {
                   <TableHead className="w-[50px]">Cor</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>User</TableHead>
+                  <TableHead>Perfil</TableHead>
                   <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -219,6 +246,17 @@ export default function ConfiguracaoPage() {
                     </TableCell>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>@{user.username}</TableCell>
+                    <TableCell>
+                      {user.role === "técnico" ? (
+                        <Badge variant="outline" className="text-xs font-bold border-amber-200 text-amber-700 bg-amber-50">
+                          DEV
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          Visitante
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Button

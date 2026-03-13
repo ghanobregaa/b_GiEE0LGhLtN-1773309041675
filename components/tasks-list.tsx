@@ -51,11 +51,14 @@ import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/lib/auth-store"
 
 export function TasksList() {
   const tasks = useProjectStore((state) => state.tasks)
   const users = useProjectStore((state) => state.users)
   const deleteTask = useProjectStore((state) => state.deleteTask)
+  const currentUser = useAuthStore((state) => state.user)
+  const isVisitor = currentUser?.role === "visitante"
 
   const [searchQuery, setSearchQuery] = useState("")
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
@@ -178,10 +181,12 @@ export function TasksList() {
             Gerencie todas as tarefas dos seus projetos
           </p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Tarefa
-        </Button>
+        {!isVisitor && (
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Tarefa
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -536,13 +541,15 @@ export function TasksList() {
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Editar
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteTask(task.id)}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Eliminar
-                                  </DropdownMenuItem>
+                                  {!isVisitor && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleDeleteTask(task.id)}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>

@@ -25,6 +25,7 @@ const mapUser = (u: any): User => ({
   username: u.username,
   name: u.name,
   color: u.color,
+  role: u.role || "técnico",
   createdAt: u.created_at,
 })
 

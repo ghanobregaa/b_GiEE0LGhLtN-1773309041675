@@ -47,7 +47,8 @@ def login():
         return jsonify({
             "id": user["id"],
             "username": user["username"],
-            "name": user["name"]
+            "name": user["name"],
+            "role": user.get("role", "técnico")
         }), 200
     except Exception as e:
         print(f"ERRO NO LOGIN: {str(e)}")
@@ -386,7 +387,7 @@ def delete_meeting(id):
 @app.route('/api/users', methods=['GET'])
 def get_users():
     try:
-        res = supabase.table("users").select("id, username, name, color, created_at").execute()
+        res = supabase.table("users").select("id, username, name, color, role, created_at").execute()
         return jsonify(res.data)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -407,7 +408,8 @@ def create_user():
             "username": username,
             "name": name or username,
             "password_hash": generate_password_hash(password),
-            "color": color
+            "color": color,
+            "role": data.get("role", "técnico")
         }
         
         res = supabase.table("users").insert(payload).execute()
@@ -427,6 +429,7 @@ def update_user(id):
         if "name" in data: payload["name"] = data["name"]
         if "username" in data: payload["username"] = data["username"]
         if "color" in data: payload["color"] = data["color"]
+        if "role" in data: payload["role"] = data["role"]
         
         # Se password for enviada, atualiza também
         if "password" in data and data["password"]:
