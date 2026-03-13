@@ -20,17 +20,18 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname()
 
   const isLoginPage = pathname === "/login"
+  const isPublicPage = pathname?.startsWith("/public")
 
   useEffect(() => {
     // Only redirect after the store has hydrated
     if (_hasHydrated) {
-      if (!isAuthenticated && !isLoginPage) {
+      if (!isAuthenticated && !isLoginPage && !isPublicPage) {
         router.push("/login")
-      } else if (isAuthenticated && !isLoginPage) {
+      } else if ((isAuthenticated || isPublicPage) && !isLoginPage) {
         fetchData()
       }
     }
-  }, [isAuthenticated, isLoginPage, _hasHydrated, router, fetchData])
+  }, [isAuthenticated, isLoginPage, isPublicPage, _hasHydrated, router, fetchData])
 
   // If store hasn't hydrated yet, show a loading placeholder
   if (!_hasHydrated) {
@@ -41,12 +42,12 @@ export function AppLayout({ children }: AppLayoutProps) {
     )
   }
 
-  // If it's the login page, just show the children (the login form)
-  if (isLoginPage) {
+  // If it's the login page or a public page, just show the children
+  if (isLoginPage || isPublicPage) {
     return <>{children}</>
   }
 
-  // If not authenticated (and not login page), show nothing while redirecting
+  // If not authenticated (and not login or public), show nothing while redirecting
   if (!isAuthenticated) {
     return null
   }

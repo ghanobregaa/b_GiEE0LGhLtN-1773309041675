@@ -209,7 +209,18 @@ export function GanttChart({ projects }: GanttChartProps) {
                   </div>
 
                   {/* Phase Rows (only if expanded) */}
-                  {expandedProjects[project.id] && project.phases.map((phase) => {
+                  {expandedProjects[project.id] && project.phases
+                    .filter((phase) => {
+                      const plannedBar = getBarPosition(phase.plannedStartDate, phase.plannedEndDate)
+                      const actualBar = phase.actualStartDate
+                        ? getBarPosition(
+                            phase.actualStartDate,
+                            phase.actualEndDate || new Date().toISOString().split("T")[0]
+                          )
+                        : null
+                      return plannedBar || actualBar
+                    })
+                    .map((phase) => {
                     const plannedBar = getBarPosition(
                       phase.plannedStartDate,
                       phase.plannedEndDate

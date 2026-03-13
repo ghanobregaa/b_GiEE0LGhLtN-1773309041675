@@ -49,6 +49,7 @@ import {
   Pencil,
   Trash2,
   Users,
+  Share2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/lib/auth-store"
@@ -143,6 +144,13 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
     }
   }
 
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/public/projeto/${project.id}`
+    navigator.clipboard.writeText(url)
+    // Usamos um alert simples para feedback imediato
+    alert("Link público copiado com sucesso!")
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -165,6 +173,10 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
           </div>
           <p className="text-muted-foreground">{project.description}</p>
         </div>
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyLink}>
+          <Share2 className="h-4 w-4" />
+          Copiar Link para Cliente
+        </Button>
       </div>
 
       {/* Project Info Cards */}
