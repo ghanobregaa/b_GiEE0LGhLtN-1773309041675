@@ -130,8 +130,9 @@ export default function MeetingDetailsPage() {
                   Participantes Internos
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {meeting.technicians.map((tech, i) => {
-                    const user = users.find(u => u.name === tech);
+                  {meeting.technicians.map((techId, i) => {
+                    const user = users.find(u => u.id === techId);
+                    const techName = user?.name || techId;
                     return (
                       <Badge 
                         key={i} 
@@ -143,7 +144,7 @@ export default function MeetingDetailsPage() {
                           color: user?.color 
                         }}
                       >
-                        {tech}
+                        {techName}
                       </Badge>
                     );
                   })}

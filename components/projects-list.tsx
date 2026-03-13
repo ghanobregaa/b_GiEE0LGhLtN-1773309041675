@@ -43,7 +43,9 @@ import {
   Eye,
   Download,
   FileDown,
+  Search,
 } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { getApiUrl } from "@/lib/api-config"
 import { useAuthStore } from "@/lib/auth-store"
 import { useRouter } from "next/navigation"
@@ -58,6 +60,7 @@ export function ProjectsList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const handleExportExcel = async () => {
     setIsExporting(true)
@@ -83,7 +86,14 @@ export function ProjectsList() {
   const filteredProjects = projects.filter((p) => {
     const statusMatch = selectedStatus === "all" || p.status === selectedStatus
     const companyMatch = selectedCompany === "all" || p.company === selectedCompany
-    return statusMatch && companyMatch
+    
+    const searchLower = searchQuery.toLowerCase()
+    const searchMatch = searchQuery === "" || 
+      p.name.toLowerCase().includes(searchLower) ||
+      p.description.toLowerCase().includes(searchLower) ||
+      p.owner.toLowerCase().includes(searchLower)
+
+    return statusMatch && companyMatch && searchMatch
   })
 
   const stats = {
@@ -236,6 +246,17 @@ export function ProjectsList() {
                 <option value="Concluído">Concluído</option>
                 <option value="Suspenso">Suspenso</option>
               </select>
+            </div>
+
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Pesquisar projetos..."
+                className="pl-8 h-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { type Project, getPhaseColor } from "@/lib/store"
 import {
@@ -9,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { ChevronRight, ChevronDown } from "lucide-react"
 
 interface GanttChartProps {
   projects: Project[]
@@ -26,6 +27,14 @@ function endOfMonth(d: Date) {
 
 export function GanttChart({ projects }: GanttChartProps) {
   const today = useMemo(() => new Date(), [])
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
+
+  const toggleProject = (projectId: string) => {
+    setExpandedProjects(prev => ({
+      ...prev,
+      [projectId]: !prev[projectId]
+    }))
+  }
 
   // Fixed window: previous month → next month
   const { startDate, endDate, totalDays, months, todayOffset } = useMemo(() => {
@@ -90,6 +99,12 @@ export function GanttChart({ projects }: GanttChartProps) {
     }
   }
 
+  const getDateOffset = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const offset = (d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    return (offset / totalDays) * 100
+  }
+
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[800px]">
@@ -151,10 +166,20 @@ export function GanttChart({ projects }: GanttChartProps) {
                 <div key={project.id} className="mb-3">
                   {/* Project Row */}
                   <div className="flex items-center hover:bg-muted/30 rounded h-8">
-                    <div className="w-52 shrink-0 px-2">
+                    <div className="w-52 shrink-0 px-2 flex items-center gap-1">
+                      <button 
+                        onClick={() => toggleProject(project.id)}
+                        className="p-0.5 hover:bg-muted rounded transition-colors"
+                      >
+                        {expandedProjects[project.id] ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
                       <Link
                         href={`/projetos/${project.id}`}
-                        className="font-semibold text-sm hover:text-primary hover:underline truncate block"
+                        className="font-semibold text-sm hover:text-primary hover:underline truncate block flex-1"
                       >
                         {project.name}
                       </Link>
@@ -182,8 +207,8 @@ export function GanttChart({ projects }: GanttChartProps) {
                     </div>
                   </div>
 
-                  {/* Phase Rows */}
-                  {project.phases.map((phase) => {
+                  {/* Phase Rows (only if expanded) */}
+                  {expandedProjects[project.id] && project.phases.map((phase) => {
                     const plannedBar = getBarPosition(
                       phase.plannedStartDate,
                       phase.plannedEndDate
@@ -247,6 +272,26 @@ export function GanttChart({ projects }: GanttChartProps) {
                             </Tooltip>
                           )}
 
+                          {/* Delayed Start Indicator Line */}
+                          {phase.actualStartDate && phase.actualStartDate > phase.plannedEndDate && (() => {
+                            const plannedEndOffset = getDateOffset(phase.plannedEndDate);
+                            const actualStartOffset = getDateOffset(phase.actualStartDate);
+                            
+                            // Only draw if within window
+                            if (plannedEndOffset < totalDays * 100 && actualStartOffset > 0) {
+                              return (
+                                <div 
+                                  className="absolute h-px border-t border-dashed border-red-400 top-2.5 z-10"
+                                  style={{
+                                    left: `${Math.max(0, plannedEndOffset)}%`,
+                                    width: `${Math.min(100, actualStartOffset) - Math.max(0, plannedEndOffset)}%`
+                                  }}
+                                />
+                              );
+                            }
+                            return null;
+                          })()}
+
                           {/* Actual bar */}
                           {actualBar && (
                             <Tooltip>
@@ -288,6 +333,10 @@ export function GanttChart({ projects }: GanttChartProps) {
           <div className="flex items-center gap-2">
             <div className="w-4 h-3 rounded-sm bg-indigo-200/60 border border-indigo-300/50" />
             <span className="text-xs text-muted-foreground">Duração do projeto</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 border-t border-dashed border-red-400 h-px" />
+            <span className="text-xs text-muted-foreground">Atraso no início</span>
           </div>
         </div>
       </div>
