@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { type Project, getPhaseColor } from "@/lib/store"
+import { useProjectStore, type Project, getPhaseColor } from "@/lib/store"
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +26,7 @@ function endOfMonth(d: Date) {
 }
 
 export function GanttChart({ projects }: GanttChartProps) {
+  const { users } = useProjectStore()
   const today = useMemo(() => new Date(), [])
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
 
@@ -261,6 +262,9 @@ export function GanttChart({ projects }: GanttChartProps) {
                                     {new Date(phase.plannedStartDate).toLocaleDateString("pt-PT")}
                                     {" → "}
                                     {new Date(phase.plannedEndDate).toLocaleDateString("pt-PT")}
+                                  </p>
+                                  <p>
+                                    Técnicos: {phase.technicianIds?.map(tid => users.find(u => u.id === tid)?.name || tid).join(", ") || "Nenhum"}
                                   </p>
                                   {phase.actualStartDate && (
                                     <p className="border-t pt-0.5 mt-0.5">

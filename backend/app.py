@@ -81,6 +81,8 @@ def to_snake(data: dict) -> dict:
         "duration_hours":   "duration_hours",
         "technicianId":     "technician_id",
         "technician_id":    "technician_id",
+        "technicianIds":    "technician_ids",
+        "technician_ids":   "technician_ids",
     }
     result = {}
     for k, v in data.items():

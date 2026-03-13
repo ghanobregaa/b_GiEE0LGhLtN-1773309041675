@@ -31,12 +31,14 @@ import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 import { CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface PhaseInput {
   id?: string
   type: PhaseType
   name: string
-  technicianId: string
+  technicianIds: string[]
   plannedStartDate: string
   plannedEndDate: string
   plannedHours: number
@@ -54,7 +56,7 @@ interface ProjectFormDialogProps {
 const emptyPhase: PhaseInput = {
   type: "Requisitos",
   name: "",
-  technicianId: "",
+  technicianIds: [],
   plannedStartDate: "",
   plannedEndDate: "",
   plannedHours: 0,
@@ -92,7 +94,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
             id: p.id,
             type: p.type,
             name: p.name,
-            technicianId: p.technicianId,
+            technicianIds: p.technicianIds || [],
             plannedStartDate: p.plannedStartDate,
             plannedEndDate: p.plannedEndDate,
             plannedHours: p.plannedHours,
@@ -124,7 +126,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
     setPhases(phases.filter((_, i) => i !== index))
   }
 
-  const updatePhase = (index: number, field: keyof PhaseInput, value: string | number) => {
+  const updatePhase = (index: number, field: keyof PhaseInput, value: any) => {
     setPhases(
       phases.map((p, i) => (i === index ? { ...p, [field]: value } : p))
     )
@@ -382,28 +384,58 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Tecnico</Label>
-                      <Select
-                        value={phase.technicianId}
-                        onValueChange={(value) => updatePhase(index, "technicianId", value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {users.filter(u => u.role === "técnico").map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-2.5 h-2.5 rounded-full" 
-                                  style={{ backgroundColor: user.color || "#ccc" }}
+                      <Label className="text-xs text-muted-foreground">Tecnicos</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal min-h-[40px] h-auto py-2"
+                          >
+                            <div className="flex flex-wrap gap-1">
+                              {phase.technicianIds.length > 0 ? (
+                                phase.technicianIds.map((tid) => {
+                                  const user = users.find((u) => u.id === tid)
+                                  return (
+                                    <Badge key={tid} variant="secondary" className="text-[10px] px-1 h-5">
+                                      {user?.name || tid}
+                                    </Badge>
+                                  )
+                                })
+                              ) : (
+                                <span className="text-muted-foreground">Selecionar técnicos</span>
+                              )}
+                            </div>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[250px] p-2" align="start">
+                          <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                            {users.filter(u => u.role === "técnico").map((user) => (
+                              <div
+                                key={user.id}
+                                className="flex items-center space-x-2 p-2 hover:bg-muted rounded-md cursor-pointer"
+                                onClick={() => {
+                                  const newIds = phase.technicianIds.includes(user.id)
+                                    ? phase.technicianIds.filter(id => id !== user.id)
+                                    : [...phase.technicianIds, user.id]
+                                  updatePhase(index, "technicianIds", newIds)
+                                }}
+                              >
+                                <Checkbox 
+                                  checked={phase.technicianIds.includes(user.id)}
+                                  onCheckedChange={() => {}} // Handle via parent click
                                 />
-                                {user.name}
+                                <div className="flex items-center gap-2">
+                                  <div 
+                                    className="w-2.5 h-2.5 rounded-full" 
+                                    style={{ backgroundColor: user.color || "#ccc" }}
+                                  />
+                                  <span className="text-sm">{user.name}</span>
+                                </div>
                               </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 

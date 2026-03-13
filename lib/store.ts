@@ -33,7 +33,7 @@ const mapPhase = (ph: any): Phase => ({
   id: String(ph.id),
   type: ph.type as PhaseType,
   name: ph.name,
-  technicianId: ph.technician_id || ph.technician || "", // Fallback para migração
+  technicianIds: ph.technician_ids || (ph.technician_id ? [String(ph.technician_id)] : (ph.technician ? [String(ph.technician)] : [])),
   plannedStartDate: ph.planned_start_date,
   plannedEndDate: ph.planned_end_date,
   plannedHours: Number(ph.planned_hours || 0),
@@ -95,7 +95,7 @@ const mapMeeting = (m: any): Meeting => ({
 const phaseToApi = (p: Partial<Phase>) => ({
   ...(p.type !== undefined && { type: p.type }),
   ...(p.name !== undefined && { name: p.name }),
-  ...(p.technicianId !== undefined && { technician_id: p.technicianId || null }),
+  ...(p.technicianIds !== undefined && { technician_ids: p.technicianIds }),
   ...(p.plannedStartDate !== undefined && { planned_start_date: p.plannedStartDate }),
   ...(p.plannedEndDate !== undefined && { planned_end_date: p.plannedEndDate }),
   ...(p.plannedHours !== undefined && { planned_hours: p.plannedHours }),

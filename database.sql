@@ -129,3 +129,7 @@ CREATE TABLE IF NOT EXISTS meetings (
 );
 
 ALTER TABLE meetings DISABLE ROW LEVEL SECURITY;
+
+-- ─── Adicionar technician_ids a phases ──────────────────
+ALTER TABLE phases
+  ADD COLUMN IF NOT EXISTS technician_ids JSONB DEFAULT '[]'::jsonb;
