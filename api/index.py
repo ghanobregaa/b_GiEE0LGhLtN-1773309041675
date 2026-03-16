@@ -220,8 +220,8 @@ def create_phase(project_id):
         
         if "planned_hours" not in payload: payload["planned_hours"] = 0
         
-        # Ensure UUID fields are not empty strings
-        for field in ["project_id", "technician_id"]:
+        # Ensure UUID and Date fields are not empty strings
+        for field in ["project_id", "technician_id", "planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
             if field in payload and not payload[field]:
                 payload[field] = None
 
@@ -236,6 +236,11 @@ def update_phase(id):
         data = request.json
         payload = to_snake(data)
         payload.pop("id", None)
+
+        # Ensure Date fields are not empty strings
+        for field in ["planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("phases").update(payload).eq("id", id).execute()
         if res.data:

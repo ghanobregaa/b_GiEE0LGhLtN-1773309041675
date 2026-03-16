@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS phases (
     name TEXT NOT NULL,
     technician_id UUID REFERENCES users(id), -- Alterado para ID
     technician TEXT, -- Manter temporariamente para compatibilidade
-    planned_start_date DATE NOT NULL,
-    planned_end_date DATE NOT NULL,
+    planned_start_date DATE,
+    planned_end_date DATE,
     planned_hours FLOAT DEFAULT 0,
     actual_start_date DATE,
     actual_end_date DATE,

@@ -364,6 +364,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(phaseToApi(phaseData)),
     })
+    if (!res.ok) throw new Error("Erro ao criar fase")
     const newRaw = await res.json()
     const newPhase = mapPhase(newRaw)
 
@@ -381,11 +382,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updatePhase: async (projectId, phaseId, updates) => {
-    await fetch(`${API_URL}/phases/${phaseId}`, {
+    const res = await fetch(`${API_URL}/phases/${phaseId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(phaseToApi(updates)),
     })
+    if (!res.ok) throw new Error("Erro ao atualizar fase")
 
     set((state) => ({
       projects: state.projects.map((p) => {
