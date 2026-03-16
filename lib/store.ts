@@ -55,7 +55,9 @@ const mapProject = (p: any): Project => ({
   actualStartDate: p.actual_start_date ?? undefined,
   actualEndDate: p.actual_end_date ?? undefined,
   actualHours: Number(p.actual_hours || 0),
-  phases: (p.phases || []).map(mapPhase),
+  phases: (p.phases || [])
+    .map(mapPhase)
+    .sort((a: Phase, b: Phase) => (a.plannedStartDate || "").localeCompare(b.plannedStartDate || "")),
 })
 
 const mapTask = (t: any): Task => ({

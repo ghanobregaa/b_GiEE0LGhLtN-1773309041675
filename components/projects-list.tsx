@@ -384,9 +384,13 @@ function ProjectRow({ project, onEdit, onDelete, isVisitor }: ProjectRowProps) {
       </TableCell>
       <TableCell>
         <div className="flex flex-col gap-1">
-          <Progress value={progress} className="h-2" />
-          <span className="text-xs text-muted-foreground text-right">
-            {progress.toFixed(2)}%
+          <Progress 
+            value={progress} 
+            className="h-2" 
+            indicatorClassName={project.status === "Concluído" ? "bg-emerald-500" : undefined}
+          />
+          <span className="text-[10px] text-muted-foreground text-right whitespace-nowrap">
+            {project.actualHours}h / {project.plannedHours}h
           </span>
         </div>
       </TableCell>

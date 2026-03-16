@@ -126,8 +126,13 @@ export function PublicProjectDetail({ project }: PublicProjectDetailProps) {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-black text-primary">{progress}%</span>
-              <Progress value={progress} className="h-3 flex-1" />
+              <span className="text-xl font-bold text-primary whitespace-nowrap">{project.actualHours}h / {project.plannedHours}h</span>
+              <Progress 
+                value={progress} 
+                className="h-3 flex-1" 
+                indicatorClassName={project.status === "Concluído" ? "bg-emerald-500" : undefined}
+              />
+              <span className="text-xs font-bold text-muted-foreground">{progress}%</span>
             </div>
           </CardContent>
         </Card>

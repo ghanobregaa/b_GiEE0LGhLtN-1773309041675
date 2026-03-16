@@ -13,7 +13,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE phase_type AS ENUM ('Requisitos', 'Desenvolvimento', 'Testes', 'Documentação');
+    CREATE TYPE phase_type AS ENUM ('Requisitos', 'Design', 'Desenvolvimento', 'Testes', 'Pós-produção');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN

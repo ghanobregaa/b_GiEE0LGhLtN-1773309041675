@@ -373,9 +373,10 @@ export function GanttChart({ projects, isReadOnly = false }: GanttChartProps) {
         <div className="flex flex-wrap items-center gap-5 mt-6 pt-4 border-t border-border">
           <span className="text-xs text-muted-foreground font-semibold">Legenda:</span>
           <LegendItem color="bg-sky-500"     label="Requisitos" />
+          <LegendItem color="bg-pink-500"    label="Design" />
           <LegendItem color="bg-amber-500"   label="Desenvolvimento" />
           <LegendItem color="bg-emerald-500" label="Testes" />
-          <LegendItem color="bg-violet-500"  label="Documentação" />
+          <LegendItem color="bg-violet-500"  label="Pós-produção" />
           <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
             <div className="w-px h-4 bg-red-500" />
             <span className="text-xs text-muted-foreground">Hoje</span>

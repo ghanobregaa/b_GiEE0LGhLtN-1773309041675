@@ -523,12 +523,16 @@ export function Dashboard() {
                         >
                           {project.name}
                         </Link>
-                        <span className="font-medium">{progress}%</span>
+                        <span className="font-medium text-xs">{project.actualHours}h / {project.plannedHours}h</span>
                       </div>
-                      <Progress value={progress} className="h-2" />
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <Progress 
+                        value={progress} 
+                        className="h-2" 
+                        indicatorClassName={project.status === "Concluído" ? "bg-emerald-500" : undefined}
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wider">
                         <span>{project.company}</span>
-                        <span>{project.actualHours}/{project.plannedHours}h</span>
+                        <span>{progress}%</span>
                       </div>
                     </div>
                   )

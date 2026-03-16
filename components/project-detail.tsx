@@ -233,8 +233,14 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
               {project.actualHours} / {project.plannedHours}h
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <Progress value={progress} className="h-2 flex-1" />
-              <span className="text-xs text-muted-foreground">{progress}%</span>
+              <Progress 
+                value={progress} 
+                className="h-2 flex-1" 
+                indicatorClassName={project.status === "Concluído" ? "bg-emerald-500" : undefined}
+              />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {project.actualHours}h / {project.plannedHours}h
+              </span>
             </div>
           </CardContent>
         </Card>

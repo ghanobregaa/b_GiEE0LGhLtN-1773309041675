@@ -1,6 +1,6 @@
 export type ProjectStatus = "Novo" | "Em curso" | "Concluído" | "Suspenso"
 export type TaskStatus = "Pendente" | "Em curso" | "Concluído"
-export type PhaseType = "Requisitos" | "Desenvolvimento" | "Testes" | "Documentação"
+export type PhaseType = "Requisitos" | "Design" | "Desenvolvimento" | "Testes" | "Pós-produção"
 
 export type UserRole = "técnico" | "visitante"
 
@@ -379,7 +379,7 @@ export const tasks: Task[] = [
     projectName: "Audit Desk",
     name: "Desenvolvimento do Sheet",
     ticket: "ac3c395a-41c9-488d-a609-48af95b8d854",
-    technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
+    technicianId: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
     requester: "Francisco Carneiro",
     plannedStartDate: "2026-02-24",
     plannedEndDate: "2026-02-24",
@@ -469,7 +469,7 @@ export const tasks: Task[] = [
     projectId: "1",
     projectName: "Audit Desk",
     name: "Fazer lógica para gerir de permissões dos utilizadores",
-    technician: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
+    technicianId: "695a6403-7af7-4bd0-acd7-6c95ff2aca4f",
     requester: "Mariana Gonçalves",
     plannedStartDate: "2026-02-26",
     plannedEndDate: "2026-02-27",
@@ -645,11 +645,13 @@ export function getPhaseColor(type: PhaseType): string {
   switch (type) {
     case "Requisitos":
       return "bg-sky-500"
+    case "Design":
+      return "bg-pink-500"
     case "Desenvolvimento":
       return "bg-amber-500"
     case "Testes":
       return "bg-emerald-500"
-    case "Documentação":
+    case "Pós-produção":
       return "bg-violet-500"
     default:
       return "bg-slate-500"

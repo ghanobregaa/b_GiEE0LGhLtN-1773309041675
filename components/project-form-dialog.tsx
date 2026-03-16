@@ -384,9 +384,10 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Requisitos">Requisitos</SelectItem>
+                          <SelectItem value="Design">Design</SelectItem>
                           <SelectItem value="Desenvolvimento">Desenvolvimento</SelectItem>
                           <SelectItem value="Testes">Testes</SelectItem>
-                          <SelectItem value="Documentação">Documentação</SelectItem>
+                          <SelectItem value="Pós-produção">Pós-produção</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -602,15 +603,16 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Horas Reais</Label>
+                        <Label className="text-xs text-muted-foreground flex justify-between">
+                          Horas Reais
+                          <span className="opacity-70">(Auto)</span>
+                        </Label>
                         <Input
                           type="number"
                           min="0"
-                          value={phase.actualHours || ""}
-                          onChange={(e) =>
-                            updatePhase(index, "actualHours", parseInt(e.target.value) || 0)
-                          }
-                          placeholder="0"
+                          value={phase.actualHours || "0"}
+                          disabled
+                          className="h-8 text-xs bg-muted/30"
                         />
                       </div>
                     </div>

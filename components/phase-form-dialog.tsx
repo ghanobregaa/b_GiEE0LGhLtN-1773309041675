@@ -160,9 +160,10 @@ export function PhaseFormDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Requisitos">Requisitos</SelectItem>
+                  <SelectItem value="Design">Design</SelectItem>
                   <SelectItem value="Desenvolvimento">Desenvolvimento</SelectItem>
                   <SelectItem value="Testes">Testes</SelectItem>
-                  <SelectItem value="Documentação">Documentação</SelectItem>
+                  <SelectItem value="Pós-produção">Pós-produção</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -388,12 +389,16 @@ export function PhaseFormDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="actualHours">Horas Reais</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="actualHours">Horas Reais</Label>
+                    <span className="text-[10px] text-muted-foreground">(Calculado das tarefas)</span>
+                  </div>
                   <Input
                     id="actualHours"
                     type="number"
                     value={formData.actualHours}
-                    onChange={(e) => setFormData({ ...formData, actualHours: Number(e.target.value) })}
+                    disabled
+                    className="bg-muted/50"
                   />
                 </div>
               </div>

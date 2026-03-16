@@ -15,7 +15,7 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  captionLayout = 'label',
+  captionLayout = 'dropdown',
   buttonVariant = 'ghost',
   formatters,
   components,
@@ -24,6 +24,11 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>['variant']
 }) {
   const defaultClassNames = getDefaultClassNames()
+
+  // Provide default year range if not specified, to enable dropdowns
+  const currentYear = new Date().getFullYear()
+  const fromYear = props.fromYear || currentYear - 10
+  const toYear = props.toYear || currentYear + 20
 
   return (
     <DayPicker
@@ -35,6 +40,8 @@ function Calendar({
         className,
       )}
       captionLayout={captionLayout}
+      fromYear={fromYear}
+      toYear={toYear}
       formatters={{
         formatMonthDropdown: (date) =>
           date.toLocaleString('default', { month: 'short' }),
