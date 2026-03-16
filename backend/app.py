@@ -117,8 +117,8 @@ def create_project():
         if "company" not in payload: payload["company"] = "SAVOY"
         if "planned_hours" not in payload: payload["planned_hours"] = 0
         
-        # Ensure UUID fields are not empty strings
-        for field in ["owner"]: # owner is text but just in case
+        # Ensure UUID and Date fields are not empty strings
+        for field in ["owner", "planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
             if field in payload and not payload[field]:
                 payload[field] = None
 
@@ -148,6 +148,11 @@ def update_project(id):
         # Remove campos que não devem ser actualizados directamente
         payload.pop("id", None)
         payload.pop("phases", None)
+
+        # Ensure Date fields are not empty strings
+        for field in ["planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("projects").update(payload).eq("id", id).execute()
         if res.data:
@@ -215,19 +220,22 @@ def export_projects_excel():
 def create_phase(project_id):
     try:
         data = request.json
+        print(f"DEBUG: create_phase data={data}")
         payload = to_snake(data)
         payload["project_id"] = project_id
         
         if "planned_hours" not in payload: payload["planned_hours"] = 0
         
-        # Ensure UUID fields are not empty strings
-        for field in ["project_id", "technician_id"]:
+        # Ensure UUID and Date fields are not empty strings
+        for field in ["project_id", "technician_id", "planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
             if field in payload and not payload[field]:
                 payload[field] = None
 
+        print(f"DEBUG: create_phase payload={payload}")
         res = supabase.table("phases").insert(payload).execute()
         return jsonify(res.data[0] if res.data else {}), 201
     except Exception as e:
+        print(f"DEBUG: create_phase error={str(e)}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/phases/<id>', methods=['PUT'])
@@ -236,6 +244,11 @@ def update_phase(id):
         data = request.json
         payload = to_snake(data)
         payload.pop("id", None)
+
+        # Ensure Date fields are not empty strings
+        for field in ["planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("phases").update(payload).eq("id", id).execute()
         if res.data:
@@ -271,8 +284,8 @@ def create_task():
         if "status" not in payload: payload["status"] = "Pendente"
         if "planned_hours" not in payload: payload["planned_hours"] = 0
 
-        # Ensure UUID fields are not empty strings
-        for field in ["project_id", "phase_id", "technician_id"]:
+        # Ensure UUID and Date fields are not empty strings
+        for field in ["project_id", "phase_id", "technician_id", "planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
             if field in payload and not payload[field]:
                 payload[field] = None
 
@@ -296,6 +309,12 @@ def update_task(id):
         data = request.json
         payload = to_snake(data)
         payload.pop("id", None)
+
+        # Ensure Date fields are not empty strings
+        for field in ["planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
+
         res = supabase.table("tasks").update(payload).eq("id", id).execute()
         if res.data:
             return jsonify(res.data[0])

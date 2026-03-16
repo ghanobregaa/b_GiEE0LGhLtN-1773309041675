@@ -307,18 +307,26 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         const isNewPhase = !phase.id || phase.id === "__new__"
         if (isNewPhase) {
           // Nova fase — cria na BD
-          await fetch(`${API_URL}/projects/${id}/phases`, {
+          const res = await fetch(`${API_URL}/projects/${id}/phases`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(phaseToApi(phase)),
           })
+          if (!res.ok) {
+            const err = await res.json()
+            throw new Error(`Erro ao criar fase "${phase.name}": ${err.error || "Erro desconhecido"}`)
+          }
         } else if (currentPhases.find((cp) => cp.id === phase.id)) {
           // Fase existente — actualiza
-          await fetch(`${API_URL}/phases/${phase.id}`, {
+          const res = await fetch(`${API_URL}/phases/${phase.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(phaseToApi(phase)),
           })
+          if (!res.ok) {
+            const err = await res.json()
+            throw new Error(`Erro ao atualizar fase "${phase.name}": ${err.error || "Erro desconhecido"}`)
+          }
         }
       }
 
@@ -364,7 +372,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(phaseToApi(phaseData)),
     })
-    if (!res.ok) throw new Error("Erro ao criar fase")
+    if (!res.ok) {
+      const errorData = await res.json()
+      throw new Error(errorData.error || "Erro ao criar fase")
+    }
     const newRaw = await res.json()
     const newPhase = mapPhase(newRaw)
 

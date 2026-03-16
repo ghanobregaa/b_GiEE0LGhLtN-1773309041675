@@ -51,6 +51,7 @@ export function PhaseFormDialog({
   const updatePhase = useProjectStore((state) => state.updatePhase)
 
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     type: "Desenvolvimento" as PhaseType,
     name: "",
@@ -66,6 +67,7 @@ export function PhaseFormDialog({
 
   useEffect(() => {
     if (open) {
+      setErrorMsg(null)
       if (editPhase) {
         setFormData({
           type: editPhase.type,
@@ -100,6 +102,7 @@ export function PhaseFormDialog({
     e.preventDefault()
     setIsLoading(true)
 
+    setErrorMsg(null)
     try {
       const phaseData = {
         type: formData.type,
@@ -119,8 +122,9 @@ export function PhaseFormDialog({
         await addPhase(projectId, phaseData)
       }
       onOpenChange(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao salvar fase:", error)
+      setErrorMsg(error.message || "Erro desconhecido ao salvar fase")
     } finally {
       setIsLoading(false)
     }
@@ -143,9 +147,15 @@ export function PhaseFormDialog({
         <DialogHeader>
           <DialogTitle>{editPhase ? "Editar Fase" : "Nova Fase"}</DialogTitle>
           <DialogDescription>
-            Defina os detalhes da fase do projeto, técnicos e cronograma.
+            Defina os detalhes, prazos e técnicos responsáveis por esta fase.
           </DialogDescription>
         </DialogHeader>
+
+        {errorMsg && (
+          <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md border border-destructive/20 mb-4">
+            {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

@@ -215,6 +215,7 @@ def export_projects_excel():
 def create_phase(project_id):
     try:
         data = request.json
+        print(f"DEBUG: create_phase data={data}")
         payload = to_snake(data)
         payload["project_id"] = project_id
         
@@ -225,9 +226,11 @@ def create_phase(project_id):
             if field in payload and not payload[field]:
                 payload[field] = None
 
+        print(f"DEBUG: create_phase payload={payload}")
         res = supabase.table("phases").insert(payload).execute()
         return jsonify(res.data[0] if res.data else {}), 201
     except Exception as e:
+        print(f"DEBUG: create_phase error={str(e)}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/phases/<id>', methods=['PUT'])
