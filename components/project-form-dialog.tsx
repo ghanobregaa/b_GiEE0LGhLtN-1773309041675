@@ -29,7 +29,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
-import { CalendarIcon, Plus, Trash2 } from "lucide-react"
+import { CalendarIcon, Plus, Trash2, X } from "lucide-react"
 import { cn, calculateBusinessHours } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -75,6 +75,9 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
     plannedEndDate: "",
   })
 
+  const [selectedOwners, setSelectedOwners] = useState<string[]>([])
+  const [ownerInput, setOwnerInput] = useState("")
+
   const [phases, setPhases] = useState<PhaseInput[]>([{ ...emptyPhase }])
 
   useEffect(() => {
@@ -103,6 +106,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
             actualHours: p.actualHours,
           }))
         )
+        setSelectedOwners(editProject.owner ? editProject.owner.split(/[,/]/).map(o => o.trim()).filter(Boolean) : [])
       } else {
         setFormData({
           name: "",
@@ -114,6 +118,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
           plannedEndDate: "",
         })
         setPhases([{ ...emptyPhase }])
+        setSelectedOwners([])
       }
     }
   }, [open, editProject])
@@ -150,6 +155,22 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
     )
   }
 
+  const handleOwnerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Tab" || e.key === "Enter") {
+      if (ownerInput.trim()) {
+        e.preventDefault()
+        if (!selectedOwners.includes(ownerInput.trim())) {
+          setSelectedOwners([...selectedOwners, ownerInput.trim()])
+        }
+        setOwnerInput("")
+      }
+    }
+  }
+
+  const removeOwner = (name: string) => {
+    setSelectedOwners(selectedOwners.filter((o) => o !== name))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -157,6 +178,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
 
     const projectData = {
       ...formData,
+      owner: selectedOwners.join(" / "),
       plannedHours: totalPlannedHours,
       // Fases existentes mantêm o id; fases novas não têm id (a BD gera o UUID)
       phases: phases.map((p) => ({
@@ -176,7 +198,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
 
   const isValid =
     formData.name &&
-    formData.owner &&
+    selectedOwners.length > 0 &&
     formData.plannedStartDate &&
     formData.plannedEndDate &&
     phases.length > 0 &&
@@ -220,15 +242,36 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="owner">Dono do Projeto</Label>
-                <Input
-                  id="owner"
-                  value={formData.owner}
-                  onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
-                  placeholder="Ex: Joao Silva"
-                  required
-                />
+              <div className="space-y-2 col-span-1 sm:col-span-1">
+                <Label htmlFor="owner">Donos do Projeto</Label>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2 min-h-[0rem]">
+                    {selectedOwners.map((owner, index) => (
+                      <Badge key={index} variant="secondary" className="gap-1 px-2 py-0.5 text-[11px] hover:bg-secondary">
+                        {owner}
+                        <button
+                          type="button"
+                          className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeOwner(owner);
+                          }}
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-destructive transition-colors" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <Input
+                    id="owner"
+                    value={ownerInput}
+                    onChange={(e) => setOwnerInput(e.target.value)}
+                    onKeyDown={handleOwnerKeyDown}
+                    placeholder="Nome e pressione TAB ou ENTER"
+                    className="h-9"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
