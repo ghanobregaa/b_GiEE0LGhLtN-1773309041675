@@ -6,6 +6,7 @@ import { useEffect } from "react"
 import { useProjectStore } from "@/lib/store"
 import { useAuthStore } from "@/lib/auth-store"
 import { useRouter, usePathname } from "next/navigation"
+import { getApiUrl } from "@/lib/api-config"
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -13,6 +14,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const fetchData = useProjectStore((state) => state.fetchData)
+  const initializeRealtime = useProjectStore((state) => state.initializeRealtime)
   const isLoading = useProjectStore((state) => state.isLoading)
   const error = useProjectStore((state) => state.error)
   const { isAuthenticated, _hasHydrated } = useAuthStore()
@@ -29,9 +31,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         router.push("/login")
       } else if ((isAuthenticated || isPublicPage) && !isLoginPage) {
         fetchData()
+        initializeRealtime()
       }
     }
-  }, [isAuthenticated, isLoginPage, isPublicPage, _hasHydrated, router, fetchData])
+  }, [isAuthenticated, isLoginPage, isPublicPage, _hasHydrated, router, fetchData, initializeRealtime])
 
   // If store hasn't hydrated yet, show a loading placeholder
   if (!_hasHydrated) {
@@ -71,8 +74,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <p className="text-destructive font-bold text-lg">Erro de Ligação</p>
                 <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">{error}</p>
                 <div className="mt-6 flex flex-col items-center gap-2">
-                  <p className="text-xs font-mono bg-muted p-2 rounded border">API: http://localhost:5000</p>
-                  <p className="text-xs text-muted-foreground italic">Certifica-te que o servidor backend está ativo.</p>
+                  <p className="text-xs font-mono bg-muted p-2 rounded border">API: {getApiUrl()}</p>
+                  <p className="text-xs text-muted-foreground italic">Certifica-te que o servidor backend está ativo na porta correta (5001).</p>
                 </div>
               </div>
             </div>

@@ -15,6 +15,7 @@ import {
 } from "./data"
 
 import { getApiUrl } from "./api-config"
+import { io, Socket } from "socket.io-client"
 
 const API_URL = getApiUrl()
 
@@ -146,6 +147,26 @@ const meetingToApi = (m: Partial<Meeting>) => ({
   ...(m.checklist !== undefined && { checklist: m.checklist }),
 })
 
+// lazy socket connection
+let socket: Socket | null = null
+const getSocket = () => {
+  if (socket) return socket
+  if (typeof window === "undefined") return null
+
+  try {
+    const socketUrl = API_URL.replace("/api", "")
+    socket = io(socketUrl, {
+      transports: ["polling", "websocket"],
+      reconnection: true,
+      autoConnect: true,
+    })
+    return socket
+  } catch (err) {
+    console.error("Socket initialization error:", err)
+    return null
+  }
+}
+
 // ─── STORE ────────────────────────────────────────────────────────────────────
 
 interface ProjectStore {
@@ -184,6 +205,8 @@ interface ProjectStore {
 
   recalculateProjectHours: (projectId: string) => Promise<void>
   recalculatePhaseHours: (phaseId: string) => Promise<void>
+  
+  initializeRealtime: () => void
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -244,6 +267,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       })
     } catch (err: any) {
       set({ error: err.message, isLoading: false })
+    }
+  },
+
+  initializeRealtime: () => {
+    const s = getSocket()
+    if (!s) return
+
+    s.off('data_changed') // Evita múltiplos listeners
+    s.on('data_changed', (payload: any) => {
+      console.log('Real-time update received:', payload)
+      get().fetchData()
+    })
+
+    if (!s.connected) {
+      s.on('connect', () => console.log('WebSocket connected to backend'))
+      s.on('disconnect', () => console.log('WebSocket disconnected'))
     }
   },
 
