@@ -1,9 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -16,12 +12,7 @@ load_dotenv()
 
 app = Flask(__name__)
 # Permitir qualquer origem para facilitar o desenvolvimento
-socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
-
-def emit_update(change_type, data=None):
-    """Auxiliar para notificar clientes via WebSocket."""
-    socketio.emit('data_changed', {'type': change_type, 'data': data})
 
 # Supabase client
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -134,7 +125,6 @@ def create_project():
         res = supabase.table("projects").insert(payload).execute()
         new_project = res.data[0] if res.data else {}
         new_project["phases"] = []
-        emit_update('projects')
         return jsonify(new_project), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -161,7 +151,6 @@ def update_project(id):
 
         res = supabase.table("projects").update(payload).eq("id", id).execute()
         if res.data:
-            emit_update('projects')
             return jsonify(res.data[0])
         return jsonify({"error": "Project not found"}), 404
     except Exception as e:
@@ -171,7 +160,6 @@ def update_project(id):
 def delete_project(id):
     # As fases e tarefas são eliminadas em cascata via ON DELETE CASCADE
     supabase.table("projects").delete().eq("id", id).execute()
-    emit_update('projects')
     return '', 204
 
 @app.route('/api/projects/export/excel', methods=['GET'])
@@ -238,7 +226,6 @@ def create_phase(project_id):
                 payload[field] = None
 
         res = supabase.table("phases").insert(payload).execute()
-        emit_update('phases')
         return jsonify(res.data[0] if res.data else {}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -252,7 +239,6 @@ def update_phase(id):
 
         res = supabase.table("phases").update(payload).eq("id", id).execute()
         if res.data:
-            emit_update('phases')
             return jsonify(res.data[0])
         return jsonify({"error": "Phase not found"}), 404
     except Exception as e:
@@ -261,7 +247,6 @@ def update_phase(id):
 @app.route('/api/phases/<id>', methods=['DELETE'])
 def delete_phase(id):
     supabase.table("phases").delete().eq("id", id).execute()
-    emit_update('phases')
     return '', 204
 
 # ─── TASKS ────────────────────────────────────────────────────────────────────
@@ -301,7 +286,6 @@ def create_task():
             if proj_res.data:
                 new_task["project_name"] = proj_res.data["name"]
 
-        emit_update('tasks')
         return jsonify(new_task), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -314,7 +298,6 @@ def update_task(id):
         payload.pop("id", None)
         res = supabase.table("tasks").update(payload).eq("id", id).execute()
         if res.data:
-            emit_update('tasks')
             return jsonify(res.data[0])
         return jsonify({"error": "Task not found"}), 404
     except Exception as e:
@@ -323,7 +306,6 @@ def update_task(id):
 @app.route('/api/tasks/<id>', methods=['DELETE'])
 def delete_task(id):
     supabase.table("tasks").delete().eq("id", id).execute()
-    emit_update('tasks')
     return '', 204
 
 # ─── MEETINGS ─────────────────────────────────────────────────────────────────
@@ -364,7 +346,6 @@ def create_meeting():
             if proj_res.data:
                 new_meeting["project_name"] = proj_res.data.get("name", "")
 
-        emit_update('meetings')
         return jsonify(new_meeting), 201
     except Exception as e:
         print(f"ERRO CREATE MEETING: {str(e)}")
@@ -388,7 +369,6 @@ def update_meeting(id):
         if not res.data:
             return jsonify({"error": "Reunião não encontrada ou erro na atualização"}), 404
             
-        emit_update('meetings')
         return jsonify(res.data[0])
     except Exception as e:
         print(f"ERRO UPDATE MEETING: {str(e)}")
@@ -398,7 +378,6 @@ def update_meeting(id):
 def delete_meeting(id):
     try:
         supabase.table("meetings").delete().eq("id", id).execute()
-        emit_update('meetings')
         return '', 204
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -439,7 +418,6 @@ def create_user():
         if res.data:
             user = res.data[0]
             del user["password_hash"]
-            emit_update('users')
             return jsonify(user), 201
         return jsonify({"error": "Não foi possível criar o utilizador"}), 400
     except Exception as e:
@@ -466,7 +444,6 @@ def update_user(id):
         if res.data:
             user = res.data[0]
             if "password_hash" in user: del user["password_hash"]
-            emit_update('users')
             return jsonify(user)
         return jsonify({"error": "Utilizador não encontrado"}), 404
     except Exception as e:
@@ -481,10 +458,9 @@ def delete_user(id):
             return jsonify({"error": "Não é possível apagar o utilizador administrador"}), 403
 
         supabase.table("users").delete().eq("id", id).execute()
-        emit_update('users')
         return '', 204
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5001)
+    app.run(debug=True, port=5001)

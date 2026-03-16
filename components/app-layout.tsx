@@ -14,7 +14,6 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const fetchData = useProjectStore((state) => state.fetchData)
-  const initializeRealtime = useProjectStore((state) => state.initializeRealtime)
   const isLoading = useProjectStore((state) => state.isLoading)
   const error = useProjectStore((state) => state.error)
   const { isAuthenticated, _hasHydrated } = useAuthStore()
@@ -31,10 +30,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         router.push("/login")
       } else if ((isAuthenticated || isPublicPage) && !isLoginPage) {
         fetchData()
-        initializeRealtime()
       }
     }
-  }, [isAuthenticated, isLoginPage, isPublicPage, _hasHydrated, router, fetchData, initializeRealtime])
+  }, [isAuthenticated, isLoginPage, isPublicPage, _hasHydrated, router, fetchData])
 
   // If store hasn't hydrated yet, show a loading placeholder
   if (!_hasHydrated) {
