@@ -29,7 +29,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
-import { CalendarIcon, Plus, Trash2, X } from "lucide-react"
+import { CalendarIcon, Loader2, Plus, Trash2, X } from "lucide-react"
 import { cn, calculateBusinessHours } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -79,6 +79,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
   const [ownerInput, setOwnerInput] = useState("")
 
   const [phases, setPhases] = useState<PhaseInput[]>([{ ...emptyPhase }])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -137,17 +138,22 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
         if (i === index) {
           const updatedPhase = { ...p, [field]: value }
           
-          // Auto-calculate hours if dates changed
-          if (field === "plannedStartDate" || field === "plannedEndDate") {
-            const hours = calculateBusinessHours(
-              updatedPhase.plannedStartDate,
-              updatedPhase.plannedEndDate
-            )
-            if (hours > 0) {
-              updatedPhase.plannedHours = hours
+          if (updatedPhase.type === "Pós-produção") {
+            updatedPhase.plannedStartDate = ""
+            updatedPhase.plannedEndDate = ""
+            updatedPhase.plannedHours = 0
+          } else {
+            // Auto-calculate hours if dates changed
+            if (field === "plannedStartDate" || field === "plannedEndDate") {
+              const hours = calculateBusinessHours(
+                updatedPhase.plannedStartDate,
+                updatedPhase.plannedEndDate
+              )
+              if (hours > 0) {
+                updatedPhase.plannedHours = hours
+              }
             }
           }
-          
           return updatedPhase
         }
         return p
@@ -173,6 +179,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
 
     const totalPlannedHours = phases.reduce((sum, p) => sum + p.plannedHours, 0)
 
@@ -194,6 +201,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
     }
 
     onOpenChange(false)
+    setIsSubmitting(false)
   }
 
   const isValid =
@@ -202,7 +210,11 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
     formData.plannedStartDate &&
     formData.plannedEndDate &&
     phases.length > 0 &&
-    phases.every((p) => p.name && p.plannedStartDate && p.plannedEndDate && p.plannedHours > 0)
+    phases.every((p) => {
+      const isPostProd = p.type === "Pós-produção"
+      if (isPostProd) return p.name && p.plannedHours >= 0
+      return p.name && p.plannedStartDate && p.plannedEndDate && p.plannedHours > 0
+    })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -502,89 +514,10 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                   </div>
 
                   {/* Row 2: Dates and Hours */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-2 flex flex-col">
-                      <Label className="text-xs text-muted-foreground">Data Inicio Prev.</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            size="sm"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal h-9",
-                              !phase.plannedStartDate && "text-muted-foreground"
-                            )}
-                          >
-                            {phase.plannedStartDate ? (
-                              format(new Date(phase.plannedStartDate), "dd/MM/yy")
-                            ) : (
-                              <span>Data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={phase.plannedStartDate ? new Date(phase.plannedStartDate) : undefined}
-                            onSelect={(date) => updatePhase(index, "plannedStartDate", date ? format(date, "yyyy-MM-dd") : "")}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    <div className="space-y-2 flex flex-col">
-                      <Label className="text-xs text-muted-foreground">Data Fim Prev.</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            size="sm"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal h-9",
-                              !phase.plannedEndDate && "text-muted-foreground"
-                            )}
-                          >
-                            {phase.plannedEndDate ? (
-                              format(new Date(phase.plannedEndDate), "dd/MM/yy")
-                            ) : (
-                              <span>Data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={phase.plannedEndDate ? new Date(phase.plannedEndDate) : undefined}
-                            onSelect={(date) => updatePhase(index, "plannedEndDate", date ? format(date, "yyyy-MM-dd") : "")}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Horas Previstas</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={phase.plannedHours || ""}
-                        onChange={(e) =>
-                          updatePhase(index, "plannedHours", parseInt(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row 3: Actual values (only when editing) */}
-                  {editProject && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-dashed">
+                  {phase.type !== "Pós-produção" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="space-y-2 flex flex-col">
-                        <Label className="text-xs text-muted-foreground">Data Inicio Real</Label>
+                        <Label className="text-xs text-muted-foreground">Data Inicio Prev.</Label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -592,11 +525,11 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                               size="sm"
                               className={cn(
                                 "w-full pl-3 text-left font-normal h-9",
-                                !phase.actualStartDate && "text-muted-foreground"
+                                !phase.plannedStartDate && "text-muted-foreground"
                               )}
                             >
-                              {phase.actualStartDate ? (
-                                format(new Date(phase.actualStartDate), "dd/MM/yy")
+                              {phase.plannedStartDate ? (
+                                format(new Date(phase.plannedStartDate), "dd/MM/yy")
                               ) : (
                                 <span>Data</span>
                               )}
@@ -606,8 +539,8 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={phase.actualStartDate ? new Date(phase.actualStartDate) : undefined}
-                              onSelect={(date) => updatePhase(index, "actualStartDate", date ? format(date, "yyyy-MM-dd") : "")}
+                              selected={phase.plannedStartDate ? new Date(phase.plannedStartDate) : undefined}
+                              onSelect={(date) => updatePhase(index, "plannedStartDate", date ? format(date, "yyyy-MM-dd") : "")}
                               initialFocus
                             />
                           </PopoverContent>
@@ -615,7 +548,7 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                       </div>
 
                       <div className="space-y-2 flex flex-col">
-                        <Label className="text-xs text-muted-foreground">Data Fim Real</Label>
+                        <Label className="text-xs text-muted-foreground">Data Fim Prev.</Label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -623,11 +556,11 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                               size="sm"
                               className={cn(
                                 "w-full pl-3 text-left font-normal h-9",
-                                !phase.actualEndDate && "text-muted-foreground"
+                                !phase.plannedEndDate && "text-muted-foreground"
                               )}
                             >
-                              {phase.actualEndDate ? (
-                                format(new Date(phase.actualEndDate), "dd/MM/yy")
+                              {phase.plannedEndDate ? (
+                                format(new Date(phase.plannedEndDate), "dd/MM/yy")
                               ) : (
                                 <span>Data</span>
                               )}
@@ -637,8 +570,8 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={phase.actualEndDate ? new Date(phase.actualEndDate) : undefined}
-                              onSelect={(date) => updatePhase(index, "actualEndDate", date ? format(date, "yyyy-MM-dd") : "")}
+                              selected={phase.plannedEndDate ? new Date(phase.plannedEndDate) : undefined}
+                              onSelect={(date) => updatePhase(index, "plannedEndDate", date ? format(date, "yyyy-MM-dd") : "")}
                               initialFocus
                             />
                           </PopoverContent>
@@ -646,19 +579,119 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground flex justify-between">
-                          Horas Reais
-                          <span className="opacity-70">(Auto)</span>
-                        </Label>
+                        <Label className="text-xs text-muted-foreground">Horas Previstas</Label>
                         <Input
                           type="number"
                           min="0"
-                          value={phase.actualHours || "0"}
-                          disabled
-                          className="h-8 text-xs bg-muted/30"
+                          value={phase.plannedHours || ""}
+                          onChange={(e) =>
+                            updatePhase(index, "plannedHours", parseInt(e.target.value) || 0)
+                          }
+                          placeholder="0"
+                          required
                         />
                       </div>
                     </div>
+                  )}
+
+                  {/* Row 3: Actual values (only when editing) */}
+                  {editProject && (
+                    <>
+                      {phase.type !== "Pós-produção" ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-dashed">
+                          <div className="space-y-2 flex flex-col">
+                            <Label className="text-xs text-muted-foreground">Data Inicio Real</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  size="sm"
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal h-9",
+                                    !phase.actualStartDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  {phase.actualStartDate ? (
+                                    format(new Date(phase.actualStartDate), "dd/MM/yy")
+                                  ) : (
+                                    <span>Data</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={phase.actualStartDate ? new Date(phase.actualStartDate) : undefined}
+                                  onSelect={(date) => updatePhase(index, "actualStartDate", date ? format(date, "yyyy-MM-dd") : "")}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div className="space-y-2 flex flex-col">
+                            <Label className="text-xs text-muted-foreground">Data Fim Real</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  size="sm"
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal h-9",
+                                    !phase.actualEndDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  {phase.actualEndDate ? (
+                                    format(new Date(phase.actualEndDate), "dd/MM/yy")
+                                  ) : (
+                                    <span>Data</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={phase.actualEndDate ? new Date(phase.actualEndDate) : undefined}
+                                  onSelect={(date) => updatePhase(index, "actualEndDate", date ? format(date, "yyyy-MM-dd") : "")}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground flex justify-between">
+                              Horas Reais
+                              <span className="opacity-70">(Auto)</span>
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={phase.actualHours || "0"}
+                              disabled
+                              className="h-8 text-xs bg-muted/30"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-4 pt-2 border-t border-dashed">
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground flex justify-between">
+                              Horas Reais (Calculadas de tarefas)
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={phase.actualHours || "0"}
+                              disabled
+                              className="h-8 text-xs bg-muted/30"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -676,7 +709,8 @@ export function ProjectFormDialog({ open, onOpenChange, editProject }: ProjectFo
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!isValid}>
+            <Button type="submit" disabled={!isValid || isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editProject ? "Guardar Alteracoes" : "Criar Projeto"}
             </Button>
           </DialogFooter>

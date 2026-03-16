@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { CalendarIcon, Loader2, Plus, Trash2, X } from "lucide-react"
+import { AlertCircle, CalendarIcon, CheckCircle2, Loader2, Plus, Trash2, X } from "lucide-react"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 
@@ -42,6 +42,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store"
 import { Meeting, MeetingChecklistItem } from "@/lib/data"
+import { useAuthStore } from "@/lib/auth-store"
 import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
@@ -62,7 +63,8 @@ interface MeetingFormDialogProps {
 }
 
 export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectId }: MeetingFormDialogProps) {
-  const { projects, users, addMeeting, updateMeeting } = useProjectStore()
+  const { projects, users, addMeeting, updateMeeting, addTask } = useProjectStore()
+  const currentUser = useAuthStore((state) => state.user)
   const [isLoading, setIsLoading] = useState(false)
   const [errorStatus, setErrorStatus] = useState<string | null>(null)
   const [selectedTechs, setSelectedTechs] = useState<string[]>([])
@@ -190,6 +192,32 @@ export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectI
         item.id === id ? { ...item, checked: !item.checked } : item
       )
     )
+  }
+
+  const handleCreateTaskFromItem = async (itemId: string, projectId: string, phaseId: string) => {
+    const item = checklist.find(i => i.id === itemId);
+    const project = projects.find(p => p.id === projectId);
+    if (!item || !project) return;
+
+    try {
+      const taskId = await addTask({
+        projectId,
+        phaseId,
+        name: item.text,
+        technicianId: currentUser?.id || "",
+        requester: project.owner, // Default to project owner
+        plannedStartDate: format(new Date(), "yyyy-MM-dd"),
+        plannedEndDate: format(new Date(), "yyyy-MM-dd"),
+        plannedHours: 1,
+        status: "Pendente",
+      });
+
+      setChecklist(prev => prev.map(i => 
+        i.id === itemId ? { ...i, taskId } : i
+      ));
+    } catch (err) {
+      console.error("Failed to create task from checklist item", err);
+    }
   }
 
   return (
@@ -395,26 +423,92 @@ export function MeetingFormDialog({ open, onOpenChange, meeting, defaultProjectI
                 </Button>
               </div>
               <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
-                {checklist.map((item) => (
-                  <div key={item.id} className="flex items-center gap-2 group">
-                    <Checkbox
-                      checked={item.checked}
-                      onCheckedChange={() => toggleChecklistItem(item.id)}
-                    />
-                    <span className={cn("text-sm flex-1", item.checked && "line-through text-muted-foreground")}>
-                      {item.text}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => removeChecklistItem(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
+                {checklist.map((item) => {
+                  const itemProject = projects.find(p => p.id === item.associatedProjectId);
+                  const itemPhases = itemProject?.phases || [];
+
+                  return (
+                    <div key={item.id} className="space-y-2 p-3 border rounded-lg bg-muted/10 group relative">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={item.checked}
+                          onCheckedChange={() => toggleChecklistItem(item.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 space-y-1">
+                          <span className={cn("text-sm block", item.checked && "line-through text-muted-foreground")}>
+                            {item.text}
+                          </span>
+                          
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {item.taskId ? (
+                              <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Tarefa Criada
+                              </Badge>
+                            ) : (
+                              <>
+                                <Select
+                                  value={item.associatedProjectId || "none"}
+                                  onValueChange={(val) => {
+                                    setChecklist(checklist.map(i => 
+                                      i.id === item.id ? { ...i, associatedProjectId: val === "none" ? undefined : val, associatedPhaseId: "" } : i
+                                    ))
+                                  }}
+                                >
+                                  <SelectTrigger className="h-7 text-[10px] w-[140px]">
+                                    <SelectValue placeholder="Projeto..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Nenhum projeto</SelectItem>
+                                    {projects.map(p => (
+                                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+
+                                <Select
+                                  value={item.associatedPhaseId || "none"}
+                                  onValueChange={(val) => {
+                                    const updatedChecklist = checklist.map(i => 
+                                      i.id === item.id ? { ...i, associatedPhaseId: val === "none" ? undefined : val } : i
+                                    )
+                                    setChecklist(updatedChecklist)
+                                    
+                                    // Automatically create task if project and phase are selected
+                                    if (item.associatedProjectId && val !== "none" && !item.taskId) {
+                                      handleCreateTaskFromItem(item.id, item.associatedProjectId, val);
+                                    }
+                                  }}
+                                  disabled={!item.associatedProjectId}
+                                >
+                                  <SelectTrigger className="h-7 text-[10px] w-[140px]">
+                                    <SelectValue placeholder="Fase..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Nenhuma fase</SelectItem>
+                                    {itemPhases.map(ph => (
+                                      <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => removeChecklistItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
                 {checklist.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-2">
                     Nenhum ponto adicionado à checklist.

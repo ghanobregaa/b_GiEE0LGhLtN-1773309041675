@@ -330,17 +330,19 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
                       </div>
                     </TableCell>
                     <TableCell className="text-center text-sm">
-                      {formatDate(phase.plannedStartDate)}
+                      {phase.type !== "Pós-produção" ? formatDate(phase.plannedStartDate) : "-"}
                     </TableCell>
                     <TableCell className="text-center text-sm">
-                      {formatDate(phase.plannedEndDate)}
-                    </TableCell>
-                    <TableCell className="text-center text-sm">{phase.plannedHours}</TableCell>
-                    <TableCell className="text-center text-sm">
-                      {phase.actualStartDate ? formatDate(phase.actualStartDate) : "-"}
+                      {phase.type !== "Pós-produção" ? formatDate(phase.plannedEndDate) : "-"}
                     </TableCell>
                     <TableCell className="text-center text-sm">
-                      {phase.actualEndDate ? formatDate(phase.actualEndDate) : "-"}
+                      {phase.type !== "Pós-produção" ? phase.plannedHours : "-"}
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      {phase.type !== "Pós-produção" && phase.actualStartDate ? formatDate(phase.actualStartDate) : "-"}
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      {phase.type !== "Pós-produção" && phase.actualEndDate ? formatDate(phase.actualEndDate) : "-"}
                     </TableCell>
                     <TableCell className="text-center text-sm">{phase.actualHours ?? "-"}</TableCell>
                     <TableCell>

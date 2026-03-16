@@ -8,6 +8,7 @@ import {
   getStatusColor,
   calculateProjectProgress,
 } from "@/lib/store"
+import { useAuthStore } from "@/lib/auth-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -53,6 +54,7 @@ export function Dashboard() {
   const tasks = useProjectStore((state) => state.tasks)
   const meetings = useProjectStore((state) => state.meetings)
   const users = useProjectStore((state) => state.users)
+  const currentUser = useAuthStore((state) => state.user)
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: "",
     end: "",
@@ -184,9 +186,10 @@ export function Dashboard() {
       totalPlannedHours, 
       totalActualHours,
       techData,
-      statusData
+      statusData,
+      myTasks: filteredTasks.filter(t => t.technicianId === currentUser?.id),
     }
-  }, [filteredProjects, filteredTasks, filteredMeetings, users])
+  }, [filteredProjects, filteredTasks, filteredMeetings, users, currentUser])
 
   const recentProjects = filteredProjects.slice(0, 5)
   const activeTasks = filteredTasks.filter((t) => t.status !== "Concluído").slice(0, 5)
@@ -378,6 +381,58 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* User Specific Section */}
+      {currentUser && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="col-span-1 border-primary/20 bg-primary/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-semibold text-primary">
+                Minhas Tarefas
+              </CardTitle>
+              <ListTodo className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {stats.myTasks.filter(t => t.status !== "Concluído").length} / {stats.myTasks.length}
+              </div>
+              <p className="text-xs text-primary/70">
+                Tarefas pendentes / totais
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card className="col-span-1 lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <CardTitle className="text-sm font-medium">As Minhas Tarefas Recentes</CardTitle>
+              <Link href="/tarefas">
+                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                  Ver todas
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="py-0">
+              <div className="space-y-1 pb-3">
+                {stats.myTasks.slice(0, 3).map(task => (
+                  <div key={task.id} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0 hover:bg-muted/30 px-2 rounded-md transition-colors">
+                    <div className="flex flex-col">
+                      <span className="font-medium truncate max-w-[200px]">{task.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{task.projectName}</span>
+                    </div>
+                    <Badge variant="secondary" className={cn("text-[10px] h-5", getStatusColor(task.status))}>
+                      {task.status}
+                    </Badge>
+                  </div>
+                ))}
+                {stats.myTasks.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4">Não tens tarefas atribuídas neste período.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* KPI Charts */}
       <div className="grid gap-6 lg:grid-cols-2">

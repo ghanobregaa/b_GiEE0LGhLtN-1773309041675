@@ -135,7 +135,7 @@ export function PhaseFormDialog({
     }))
   }
 
-  const isValid = formData.name && formData.plannedStartDate && formData.plannedEndDate && formData.plannedHours >= 0
+  const isValid = formData.name && (formData.type === "Pós-produção" || (formData.plannedStartDate && formData.plannedEndDate)) && formData.plannedHours >= 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -153,7 +153,12 @@ export function PhaseFormDialog({
               <Label htmlFor="type">Tipo de Fase</Label>
               <Select
                 value={formData.type}
-                onValueChange={(val: PhaseType) => setFormData({ ...formData, type: val })}
+                onValueChange={(val: PhaseType) => {
+                  const updates = val === "Pós-produção" 
+                    ? { type: val, plannedStartDate: "", plannedEndDate: "", plannedHours: 0 }
+                    : { type: val };
+                  setFormData({ ...formData, ...updates });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
@@ -234,91 +239,93 @@ export function PhaseFormDialog({
             </Popover>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2 flex flex-col">
-              <Label>Data Início Prevista</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      !formData.plannedStartDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.plannedStartDate ? (
-                      format(new Date(formData.plannedStartDate), "PPP", { locale: pt })
-                    ) : (
-                      <span>Data</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.plannedStartDate ? new Date(formData.plannedStartDate) : undefined}
-                    onSelect={(date) => {
-                      const newStart = date ? format(date, "yyyy-MM-dd") : ""
-                      const hours = calculateBusinessHours(newStart, formData.plannedEndDate)
-                      setFormData({
-                        ...formData,
-                        plannedStartDate: newStart,
-                        plannedHours: hours > 0 ? hours : formData.plannedHours
-                      })
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          {formData.type !== "Pós-produção" && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2 flex flex-col">
+                <Label>Data Início Prevista</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !formData.plannedStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.plannedStartDate ? (
+                        format(new Date(formData.plannedStartDate), "PPP", { locale: pt })
+                      ) : (
+                        <span>Data</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.plannedStartDate ? new Date(formData.plannedStartDate) : undefined}
+                      onSelect={(date) => {
+                        const newStart = date ? format(date, "yyyy-MM-dd") : ""
+                        const hours = calculateBusinessHours(newStart, formData.plannedEndDate)
+                        setFormData({
+                          ...formData,
+                          plannedStartDate: newStart,
+                          plannedHours: hours > 0 ? hours : formData.plannedHours
+                        })
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="space-y-2 flex flex-col">
-              <Label>Data Fim Prevista</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      !formData.plannedEndDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.plannedEndDate ? (
-                      format(new Date(formData.plannedEndDate), "PPP", { locale: pt })
-                    ) : (
-                      <span>Data</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.plannedEndDate ? new Date(formData.plannedEndDate) : undefined}
-                    onSelect={(date) => {
-                      const newEnd = date ? format(date, "yyyy-MM-dd") : ""
-                      const hours = calculateBusinessHours(formData.plannedStartDate, newEnd)
-                      setFormData({
-                        ...formData,
-                        plannedEndDate: newEnd,
-                        plannedHours: hours > 0 ? hours : formData.plannedHours
-                      })
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+              <div className="space-y-2 flex flex-col">
+                <Label>Data Fim Prevista</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !formData.plannedEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.plannedEndDate ? (
+                        format(new Date(formData.plannedEndDate), "PPP", { locale: pt })
+                      ) : (
+                        <span>Data</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.plannedEndDate ? new Date(formData.plannedEndDate) : undefined}
+                      onSelect={(date) => {
+                        const newEnd = date ? format(date, "yyyy-MM-dd") : ""
+                        const hours = calculateBusinessHours(formData.plannedStartDate, newEnd)
+                        setFormData({
+                          ...formData,
+                          plannedEndDate: newEnd,
+                          plannedHours: hours > 0 ? hours : formData.plannedHours
+                        })
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="plannedHours">Horas Previstas</Label>
-              <Input
-                id="plannedHours"
-                type="number"
-                value={formData.plannedHours}
-                onChange={(e) => setFormData({ ...formData, plannedHours: Number(e.target.value) })}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="plannedHours">Horas Previstas</Label>
+                <Input
+                  id="plannedHours"
+                  type="number"
+                  value={formData.plannedHours}
+                  onChange={(e) => setFormData({ ...formData, plannedHours: Number(e.target.value) })}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -331,76 +338,95 @@ export function PhaseFormDialog({
             </div>
 
             {formData.hasActualDates && (
-              <div className="grid grid-cols-3 gap-4 p-4 border rounded-md bg-muted/20">
-                <div className="space-y-2 flex flex-col">
-                  <Label>Início Real</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.actualStartDate ? (
-                          format(new Date(formData.actualStartDate), "dd/MM/yyyy")
-                        ) : (
-                          <span>Data</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.actualStartDate ? new Date(formData.actualStartDate) : undefined}
-                        onSelect={(date) =>
-                          setFormData({
-                            ...formData,
-                            actualStartDate: date ? format(date, "yyyy-MM-dd") : "",
-                          })
-                        }
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+              <div className="space-y-4">
+                {formData.type !== "Pós-produção" ? (
+                  <div className="grid grid-cols-3 gap-4 p-4 border rounded-md bg-muted/20">
+                    <div className="space-y-2 flex flex-col">
+                      <Label>Início Real</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="justify-start text-left font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.actualStartDate ? (
+                              format(new Date(formData.actualStartDate), "dd/MM/yyyy")
+                            ) : (
+                              <span>Data</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={formData.actualStartDate ? new Date(formData.actualStartDate) : undefined}
+                            onSelect={(date) =>
+                              setFormData({
+                                ...formData,
+                                actualStartDate: date ? format(date, "yyyy-MM-dd") : "",
+                              })
+                            }
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
 
-                <div className="space-y-2 flex flex-col">
-                  <Label>Fim Real</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.actualEndDate ? (
-                          format(new Date(formData.actualEndDate), "dd/MM/yyyy")
-                        ) : (
-                          <span>Data</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.actualEndDate ? new Date(formData.actualEndDate) : undefined}
-                        onSelect={(date) =>
-                          setFormData({
-                            ...formData,
-                            actualEndDate: date ? format(date, "yyyy-MM-dd") : "",
-                          })
-                        }
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                    <div className="space-y-2 flex flex-col">
+                      <Label>Fim Real</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="justify-start text-left font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.actualEndDate ? (
+                              format(new Date(formData.actualEndDate), "dd/MM/yyyy")
+                            ) : (
+                              <span>Data</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={formData.actualEndDate ? new Date(formData.actualEndDate) : undefined}
+                            onSelect={(date) =>
+                              setFormData({
+                                ...formData,
+                                actualEndDate: date ? format(date, "yyyy-MM-dd") : "",
+                              })
+                            }
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="actualHours">Horas Reais</Label>
-                    <span className="text-[10px] text-muted-foreground">(Calculado das tarefas)</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="actualHours">Horas Reais</Label>
+                        <span className="text-[10px] text-muted-foreground">(Calculado das tarefas)</span>
+                      </div>
+                      <Input
+                        id="actualHours"
+                        type="number"
+                        value={formData.actualHours}
+                        disabled
+                        className="bg-muted/50"
+                      />
+                    </div>
                   </div>
-                  <Input
-                    id="actualHours"
-                    type="number"
-                    value={formData.actualHours}
-                    disabled
-                    className="bg-muted/50"
-                  />
-                </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 p-4 border rounded-md bg-muted/20">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="actualHours">Horas Reais (Calculadas de tarefas)</Label>
+                      </div>
+                      <Input
+                        id="actualHours"
+                        type="number"
+                        value={formData.actualHours}
+                        disabled
+                        className="bg-muted/50"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -18,7 +18,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { cn, calculateBusinessHours } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,6 +64,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
     status: "Pendente" as TaskStatus,
     hasActualDates: false,
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset form when opening or when editTask changes
   useEffect(() => {
@@ -91,7 +92,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
           phaseId: "",
           name: "",
           ticket: "",
-          technicianId: "",
+          technicianId: currentUser?.id || "",
           requester: "",
           plannedStartDate: "",
           plannedEndDate: "",
@@ -104,10 +105,11 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
         })
       }
     }
-  }, [open, editTask, defaultProjectId])
+  }, [open, editTask, defaultProjectId, currentUser?.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
 
     const taskData = {
       projectId: formData.projectId,
@@ -132,6 +134,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
     }
 
     onOpenChange(false)
+    setIsSubmitting(false)
   }
 
   const selectedProject = projects.find((p) => p.id === formData.projectId)
@@ -165,7 +168,15 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
               <Label htmlFor="projectId">Projeto</Label>
               <Select
                 value={formData.projectId}
-                onValueChange={(value) => setFormData({ ...formData, projectId: value, phaseId: "" })}
+                onValueChange={(value) => {
+                  const project = projects.find(p => p.id === value);
+                  setFormData({ 
+                    ...formData, 
+                    projectId: value, 
+                    phaseId: "",
+                    requester: project?.owner || formData.requester 
+                  })
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um projeto" />
@@ -256,8 +267,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
                   {users.filter(u => u.role === "técnico").map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-full" 
+                        <div
+                          className="w-2.5 h-2.5 rounded-full"
                           style={{ backgroundColor: user.color || "#ccc" }}
                         />
                         {user.name}
@@ -475,7 +486,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!isValid}>
+            <Button type="submit" disabled={!isValid || isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editTask ? "Guardar Alterações" : "Criar Tarefa"}
             </Button>
           </DialogFooter>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useProjectStore, formatDate, getStatusColor, type Task } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Popover,
   PopoverContent,
@@ -69,6 +70,14 @@ export function TasksList() {
     start: "",
     end: "",
   })
+  const [activeTab, setActiveTab] = useState<string>("all")
+
+  // Set default tab once user is loaded
+  useEffect(() => {
+    if (currentUser?.role === "técnico") {
+      setActiveTab("mine")
+    }
+  }, [currentUser])
 
   const hasDateFilter = dateRange.start || dateRange.end
 
@@ -82,6 +91,9 @@ export function TasksList() {
         task.requester.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesStatus = statusFilter === "all" || task.status === statusFilter
+
+      // Mine filter
+      const matchesMine = activeTab === "all" || task.technicianId === currentUser?.id
 
       // Date filter
       let matchesDate = true
@@ -100,7 +112,7 @@ export function TasksList() {
         }
       }
 
-      return matchesSearch && matchesStatus && matchesDate
+      return matchesSearch && matchesStatus && matchesDate && matchesMine
     })
 
     const grouped = filtered.reduce(
@@ -115,7 +127,7 @@ export function TasksList() {
     )
 
     return grouped
-  }, [tasks, searchQuery, statusFilter, dateRange])
+  }, [tasks, searchQuery, statusFilter, dateRange, activeTab, currentUser?.id, users])
 
   const toggleProject = (projectName: string) => {
     setExpandedProjects((prev) => {
@@ -250,145 +262,14 @@ export function TasksList() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </div>      {/* Tabs for My Tasks / All Tasks */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="mine">Minhas Tarefas</TabsTrigger>
+            <TabsTrigger value="all">Todas as Tarefas</TabsTrigger>
+          </TabsList>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Pesquisar tarefas..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Date Filter */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <CalendarDays className="h-4 w-4" />
-                {hasDateFilter ? "Filtro Ativo" : "Período"}
-                {hasDateFilter && (
-                  <Badge variant="secondary" className="ml-1">
-                    1
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-72" align="end">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Filtrar por Período</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Selecione o intervalo de datas.
-                  </p>
-                </div>
-                <div className="grid gap-3">
-                  <div className="space-y-1 flex flex-col">
-                    <Label htmlFor="task-start-date" className="text-xs">
-                      Data Início
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          size="sm"
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !dateRange.start && "text-muted-foreground"
-                          )}
-                        >
-                          {dateRange.start ? (
-                            format(new Date(dateRange.start), "dd/MM/yy")
-                          ) : (
-                            <span>Data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={dateRange.start ? new Date(dateRange.start) : undefined}
-                          onSelect={(date) =>
-                            setDateRange((prev) => ({ ...prev, start: date ? format(date, "yyyy-MM-dd") : "" }))
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-1 flex flex-col">
-                    <Label htmlFor="task-end-date" className="text-xs">
-                      Data Fim
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          size="sm"
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !dateRange.end && "text-muted-foreground"
-                          )}
-                        >
-                          {dateRange.end ? (
-                            format(new Date(dateRange.end), "dd/MM/yy")
-                          ) : (
-                            <span>Data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={dateRange.end ? new Date(dateRange.end) : undefined}
-                          onSelect={(date) =>
-                            setDateRange((prev) => ({ ...prev, end: date ? format(date, "yyyy-MM-dd") : "" }))
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                {hasDateFilter && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={clearDateFilter}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Limpar Filtro
-                  </Button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {hasDateFilter && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearDateFilter}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Estado:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-            >
-              <option value="all">Todos</option>
-              <option value="Pendente">Pendente</option>
-              <option value="Em curso">Em curso</option>
-              <option value="Concluído">Concluído</option>
-            </select>
-          </div>
           <div className="flex items-center gap-2">
             <button onClick={expandAll} className="text-sm text-primary hover:underline">
               Expandir
@@ -399,182 +280,319 @@ export function TasksList() {
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Date Filter Active Indicator */}
-      {hasDateFilter && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-          <CalendarDays className="h-4 w-4" />
-          <span>
-            Período:{" "}
-            {dateRange.start ? formatDate(dateRange.start) : "Início"} até{" "}
-            {dateRange.end ? formatDate(dateRange.end) : "Fim"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 ml-auto"
-            onClick={clearDateFilter}
-          >
-            Limpar
-          </Button>
-        </div>
-      )}
-
-      {/* Tasks grouped by Project */}
-      <div className="space-y-4">
-        {Object.entries(groupedTasks).map(([projectName, projectTasks]) => {
-          const isExpanded = expandedProjects.has(projectName)
-          const totalHoras = projectTasks.reduce((acc, t) => acc + t.plannedHours, 0)
-          const horasReais = projectTasks.reduce((acc, t) => acc + (t.actualHours || 0), 0)
-
-          return (
-            <Card key={projectName}>
-              <Collapsible open={isExpanded} onOpenChange={() => toggleProject(projectName)}>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        )}
-                        <CardTitle className="text-lg">Projeto: {projectName}</CardTitle>
-                        <Badge variant="outline">{projectTasks.length}</Badge>
+        <TabsContent value={activeTab} className="mt-4">
+          {/* Filters moved inside TabsContent if needed, or keep above */}
+          <div className="flex flex-col gap-4">
+            {/* Filters Row */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-2">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Pesquisar tarefas..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Date Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      {hasDateFilter ? "Filtro Ativo" : "Período"}
+                      {hasDateFilter && (
+                        <Badge variant="secondary" className="ml-1">
+                          1
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72" align="end">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <h4 className="font-medium leading-none">Filtrar por Período</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Selecione o intervalo de datas.
+                        </p>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>
-                          Horas: {horasReais}/{totalHoras}
-                        </span>
-                        <span>
-                          Concluídas:{" "}
-                          {projectTasks.filter((t) => t.status === "Concluído").length}/
-                          {projectTasks.length}
-                        </span>
+                      <div className="grid gap-3">
+                        <div className="space-y-1 flex flex-col">
+                          <Label htmlFor="task-start-date" className="text-xs">
+                            Data Início
+                          </Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                size="sm"
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !dateRange.start && "text-muted-foreground"
+                                )}
+                              >
+                                {dateRange.start ? (
+                                  format(new Date(dateRange.start), "dd/MM/yy")
+                                ) : (
+                                  <span>Data</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={dateRange.start ? new Date(dateRange.start) : undefined}
+                                onSelect={(date) =>
+                                  setDateRange((prev) => ({ ...prev, start: date ? format(date, "yyyy-MM-dd") : "" }))
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-1 flex flex-col">
+                          <Label htmlFor="task-end-date" className="text-xs">
+                            Data Fim
+                          </Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                size="sm"
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !dateRange.end && "text-muted-foreground"
+                                )}
+                              >
+                                {dateRange.end ? (
+                                  format(new Date(dateRange.end), "dd/MM/yy")
+                                ) : (
+                                  <span>Data</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={dateRange.end ? new Date(dateRange.end) : undefined}
+                                onSelect={(date) =>
+                                  setDateRange((prev) => ({ ...prev, end: date ? format(date, "yyyy-MM-dd") : "" }))
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
+                      {hasDateFilter && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={clearDateFilter}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Limpar Filtro
+                        </Button>
+                      )}
                     </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Tarefa</TableHead>
-                          <TableHead>Ticket</TableHead>
-                          <TableHead>Técnico</TableHead>
-                          <TableHead>Requisitante</TableHead>
-                          <TableHead className="text-center">Data Início Prev.</TableHead>
-                          <TableHead className="text-center">Data Fim Prev.</TableHead>
-                          <TableHead className="text-center">Horas Prev.</TableHead>
-                          <TableHead className="text-center">Data Início Real</TableHead>
-                          <TableHead className="text-center">Data Fim Real</TableHead>
-                          <TableHead className="text-center">Horas Reais</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="w-10"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {projectTasks.map((task) => (
-                          <TableRow key={task.id}>
-                            <TableCell className="font-medium max-w-[200px] truncate">
-                              {task.name}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {task.ticket || "-"}
-                            </TableCell>
-                            <TableCell>
-                              {task.technicianId && (
-                                <div className="flex items-center gap-1.5">
-                                  {(() => {
-                                    const user = users.find(u => u.id === task.technicianId);
-                                    const techName = user?.name || task.technicianId;
-                                    return (
-                                      <Badge 
-                                        variant="outline" 
-                                        className="text-[10px] px-1.5 py-0 font-normal"
-                                        style={{ 
-                                          borderColor: user?.color,
-                                          backgroundColor: user?.color ? `${user.color}15` : undefined,
-                                          color: user?.color
-                                        }}
-                                      >
-                                        {techName}
-                                      </Badge>
-                                    );
-                                  })()}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground max-w-[120px] truncate">
-                              {task.requester}
-                            </TableCell>
-                            <TableCell className="text-center text-sm">
-                              {formatDate(task.plannedStartDate)}
-                            </TableCell>
-                            <TableCell className="text-center text-sm">
-                              {formatDate(task.plannedEndDate)}
-                            </TableCell>
-                            <TableCell className="text-center">{task.plannedHours}</TableCell>
-                            <TableCell className="text-center text-sm">
-                              {task.actualStartDate ? formatDate(task.actualStartDate) : "-"}
-                            </TableCell>
-                            <TableCell className="text-center text-sm">
-                              {task.actualEndDate ? formatDate(task.actualEndDate) : "-"}
-                            </TableCell>
-                            <TableCell className="text-center">{task.actualHours ?? "-"}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={getStatusColor(task.status)}>
-                                {task.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    <span className="sr-only">Ações</span>
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  {!isVisitor && (
-                                    <DropdownMenuItem
-                                      onClick={() => handleDeleteTask(task.id)}
-                                      className="text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Eliminar
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-          )
-        })}
+                  </PopoverContent>
+                </Popover>
 
-        {Object.keys(groupedTasks).length === 0 && (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <p className="text-muted-foreground">
-                Nenhuma tarefa encontrada com os filtros selecionados.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                {hasDateFilter && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearDateFilter}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Estado:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="Pendente">Pendente</option>
+                    <option value="Em curso">Em curso</option>
+                    <option value="Concluído">Concluído</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Date Filter Active Indicator */}
+            {hasDateFilter && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                <CalendarDays className="h-4 w-4" />
+                <span>
+                  Período:{" "}
+                  {dateRange.start ? formatDate(dateRange.start) : "Início"} até{" "}
+                  {dateRange.end ? formatDate(dateRange.end) : "Fim"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 ml-auto"
+                  onClick={clearDateFilter}
+                >
+                  Limpar
+                </Button>
+              </div>
+            )}
+
+            {/* Tasks grouped by Project */}
+            <div className="space-y-4 pt-2">
+              {Object.entries(groupedTasks).map(([projectName, projectTasks]) => {
+                const isExpanded = expandedProjects.has(projectName)
+                const totalHoras = projectTasks.reduce((acc, t) => acc + t.plannedHours, 0)
+                const horasReais = projectTasks.reduce((acc, t) => acc + (t.actualHours || 0), 0)
+
+                return (
+                  <Card key={projectName}>
+                    <Collapsible open={isExpanded} onOpenChange={() => toggleProject(projectName)}>
+                      <CollapsibleTrigger asChild>
+                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <CardTitle className="text-base font-semibold">Projeto: {projectName}</CardTitle>
+                              <Badge variant="outline" className="h-5 px-1.5">{projectTasks.length}</Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>
+                                Horas: {horasReais}/{totalHoras}
+                              </span>
+                              <span>
+                                Concluídas:{" "}
+                                {projectTasks.filter((t) => t.status === "Concluído").length}/
+                                {projectTasks.length}
+                              </span>
+                            </div>
+                          </div>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent className="pt-0">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="h-9">Tarefa</TableHead>
+                                <TableHead className="h-9">Ticket</TableHead>
+                                <TableHead className="h-9">Técnico</TableHead>
+                                <TableHead className="h-9">Requisitante</TableHead>
+                                <TableHead className="text-center h-9">Início Prev.</TableHead>
+                                <TableHead className="text-center h-9">Fim Prev.</TableHead>
+                                <TableHead className="text-center h-9">H. Prev.</TableHead>
+                                <TableHead className="text-center h-9">H. Reais</TableHead>
+                                <TableHead className="h-9">Estado</TableHead>
+                                <TableHead className="w-10 h-9"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {projectTasks.map((task) => (
+                                <TableRow key={task.id} className="h-12">
+                                  <TableCell className="font-medium max-w-[200px] truncate py-2">
+                                    {task.name}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground py-2 text-xs">
+                                    {task.ticket || "-"}
+                                  </TableCell>
+                                  <TableCell className="py-2">
+                                    {task.technicianId && (
+                                      <div className="flex items-center gap-1.5">
+                                        {(() => {
+                                          const user = users.find(u => u.id === task.technicianId);
+                                          const techName = user?.name || task.technicianId;
+                                          return (
+                                            <Badge 
+                                              variant="outline" 
+                                              className="text-[9px] px-1.5 py-0 font-normal h-4"
+                                              style={{ 
+                                                borderColor: user?.color,
+                                                backgroundColor: user?.color ? `${user.color}15` : undefined,
+                                                color: user?.color
+                                              }}
+                                            >
+                                              {techName}
+                                            </Badge>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground max-w-[120px] truncate py-2 text-xs">
+                                    {task.requester}
+                                  </TableCell>
+                                  <TableCell className="text-center text-xs py-2">
+                                    {formatDate(task.plannedStartDate)}
+                                  </TableCell>
+                                  <TableCell className="text-center text-xs py-2">
+                                    {formatDate(task.plannedEndDate)}
+                                  </TableCell>
+                                  <TableCell className="text-center py-2 text-xs">{task.plannedHours}</TableCell>
+                                  <TableCell className="text-center py-2 text-xs font-semibold">{task.actualHours ?? "-"}</TableCell>
+                                  <TableCell className="py-2">
+                                    <Badge variant="secondary" className={cn("text-[10px] h-5 px-1.5", getStatusColor(task.status))}>
+                                      {task.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="py-2">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                          <span className="sr-only">Ações</span>
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                                          <Pencil className="h-4 w-4 mr-2" />
+                                          Editar
+                                        </DropdownMenuItem>
+                                        {!isVisitor && (
+                                          <DropdownMenuItem
+                                            onClick={() => handleDeleteTask(task.id)}
+                                            className="text-destructive"
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Eliminar
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </Card>
+                )
+              })}
+
+              {Object.keys(groupedTasks).length === 0 && (
+                <Card>
+                  <CardContent className="py-10 text-center">
+                    <p className="text-muted-foreground">
+                      Nenhuma tarefa encontrada com os filtros selecionados.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Task Form Dialog */}
       <TaskFormDialog open={isDialogOpen} onOpenChange={handleDialogClose} editTask={editingTask} />

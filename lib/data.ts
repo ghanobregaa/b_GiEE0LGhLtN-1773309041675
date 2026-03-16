@@ -17,6 +17,9 @@ export interface MeetingChecklistItem {
   id: string
   text: string
   checked: boolean
+  associatedProjectId?: string
+  associatedPhaseId?: string
+  taskId?: string
 }
 
 export interface Meeting {
