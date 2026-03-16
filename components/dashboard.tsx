@@ -30,7 +30,10 @@ import {
   X,
   Users,
   CalendarIcon,
+  FileDown,
+  Loader2,
 } from "lucide-react"
+import { getApiUrl } from "@/lib/api-config"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
 import { Calendar } from "@/components/ui/calendar"
@@ -59,6 +62,34 @@ export function Dashboard() {
     start: "",
     end: "",
   })
+  const [isExporting, setIsExporting] = useState(false)
+  const API_URL = getApiUrl()
+
+  const handleMonthlyExport = async () => {
+    setIsExporting(true)
+    try {
+      const response = await fetch(`${API_URL}/reports/monthly/export`)
+      if (!response.ok) throw new Error("Falha na exportação")
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const date = new Date()
+      date.setMonth(date.getMonth() - 1)
+      const fileName = `Relatorio_Mensal_${(date.getMonth() + 1).toString().padStart(2, '0')}_${date.getFullYear()}.pdf`
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error("Erro ao exportar:", error)
+      alert("Erro ao exportar o relatório mensal.")
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const hasDateFilter = dateRange.start || dateRange.end
 
@@ -211,6 +242,20 @@ export function Dashboard() {
 
         {/* Date Filter */}
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            className="gap-2 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+            onClick={handleMonthlyExport}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            Exportar Relatório Mensal
+          </Button>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2">
