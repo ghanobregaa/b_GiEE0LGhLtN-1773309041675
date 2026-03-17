@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { useProjectStore, type Task, type TimesheetEntry } from "@/lib/store"
 import { useAuthStore } from "@/lib/auth-store"
 import {
@@ -56,6 +56,8 @@ export default function TimesheetPage() {
   
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
   const [selectedTaskDefaultDates, setSelectedTaskDefaultDates] = useState<{start: string, end: string}>()
+  
+  const todayRef = useRef<HTMLDivElement>(null)
 
   // Log time dialog state
   const [isLogTimeOpen, setIsLogTimeOpen] = useState(false)
@@ -76,6 +78,14 @@ export default function TimesheetPage() {
       setWeekStartsOn(parseInt(savedWeekStart) as 0 | 1)
     }
   }, [])
+
+  useEffect(() => {
+    if (viewMode === "month" && todayRef.current) {
+      setTimeout(() => {
+        todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
+    }
+  }, [currentDate, viewMode, weekStartsOn])
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode)
@@ -322,12 +332,12 @@ export default function TimesheetPage() {
             return (
               <div 
                 key={day.toISOString()} 
+                ref={currentIsToday ? todayRef : null}
                 className={cn(
                   "border-r border-b min-h-[140px] p-2 flex flex-col relative group/cell transition-colors overflow-hidden",
-                  isDiffMonth && "bg-muted/30 opacity-60",
-                  currentIsToday && "bg-primary/5",
-                  weekend && "bg-muted/10",
-                  !weekend && "hover:bg-muted/20"
+                  weekend ? "bg-muted/60 dark:bg-muted/20" : "bg-background hover:bg-muted/20",
+                  isDiffMonth && "opacity-40 grayscale-[30%]",
+                  currentIsToday && "bg-primary/5 ring-1 ring-primary/40 ring-inset z-10"
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
