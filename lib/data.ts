@@ -63,8 +63,8 @@ export interface Task {
   ticket?: string
   technicianId: string   // Alterado de technician (string) para ID
   requester: string
-  plannedStartDate: string
-  plannedEndDate: string
+  plannedStartDate?: string
+  plannedEndDate?: string
   plannedHours: number
   actualStartDate?: string
   actualEndDate?: string
