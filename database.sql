@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     technician_id UUID REFERENCES users(id), -- Alterado para ID
     technician TEXT, -- Manter temporariamente para compatibilidade
     requester TEXT NOT NULL,
-    planned_start_date DATE NOT NULL,
-    planned_end_date DATE NOT NULL,
+    planned_start_date DATE,
+    planned_end_date DATE,
     planned_hours FLOAT DEFAULT 0,
     actual_start_date DATE,
     actual_end_date DATE,
@@ -138,3 +138,7 @@ ALTER TABLE meetings DISABLE ROW LEVEL SECURITY;
 -- ─── Adicionar technician_ids a phases ──────────────────
 ALTER TABLE phases
   ADD COLUMN IF NOT EXISTS technician_ids JSONB DEFAULT '[]'::jsonb;
+
+-- ─── Permitir Nulls nas Datas Planeadas das Tasks──────────
+ALTER TABLE tasks ALTER COLUMN planned_start_date DROP NOT NULL;
+ALTER TABLE tasks ALTER COLUMN planned_end_date DROP NOT NULL;
