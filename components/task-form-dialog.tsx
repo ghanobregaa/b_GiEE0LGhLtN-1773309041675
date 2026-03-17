@@ -40,9 +40,10 @@ interface TaskFormDialogProps {
   editTask?: Task | null
   defaultProjectId?: string
   defaultDates?: { start: string, end: string }
+  defaultUseActualDates?: boolean
 }
 
-export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId, defaultDates }: TaskFormDialogProps) {
+export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId, defaultDates, defaultUseActualDates }: TaskFormDialogProps) {
   const projects = useProjectStore((state) => state.projects)
   const users = useProjectStore((state) => state.users)
   const tasks = useProjectStore((state) => state.tasks)
@@ -98,14 +99,14 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
           ticket: "",
           technicianId: currentUser?.id || "",
           requester: "",
-          plannedStartDate: defaultDates?.start || "",
-          plannedEndDate: defaultDates?.end || "",
-          plannedHours: defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0,
-          actualStartDate: "",
-          actualEndDate: "",
-          actualHours: 0,
-          status: "Pendente",
-          hasActualDates: false,
+          plannedStartDate: defaultUseActualDates ? "" : (defaultDates?.start || ""),
+          plannedEndDate: defaultUseActualDates ? "" : (defaultDates?.end || ""),
+          plannedHours: defaultUseActualDates ? 0 : (defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0),
+          actualStartDate: defaultUseActualDates ? (defaultDates?.start || "") : "",
+          actualEndDate: defaultUseActualDates ? (defaultDates?.end || "") : "",
+          actualHours: defaultUseActualDates ? (defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0) : 0,
+          status: defaultUseActualDates ? "Em curso" : "Pendente",
+          hasActualDates: !!defaultUseActualDates,
         })
       }
     }
@@ -150,8 +151,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
   const pendingTasks = tasks.filter(
     (t) => 
       t.projectId === formData.projectId && 
-      t.status === "Pendente" && 
-      t.technicianId === formData.technicianId
+      t.technicianId === formData.technicianId &&
+      (t.status === "Pendente" || (!t.actualStartDate && !t.actualEndDate))
   )
 
   const isValid =
@@ -231,7 +232,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
           {!editTask && formData.projectId && pendingTasks.length > 0 && (
             <div className="space-y-2 p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/50">
               <Label htmlFor="pendingTask" className="text-orange-800 dark:text-orange-400 font-semibold">
-                Tem tarefas pendentes neste projeto. Deseja planear alguma?
+                Tem tarefas pendentes ou por iniciar neste projeto. Deseja planear/executar alguma?
               </Label>
               <Select
                 value={selectedPendingTaskId}

@@ -55,6 +55,7 @@ export default function TimesheetPage() {
   const [selectedTechId, setSelectedTechId] = useState<string>(currentUser?.id || "")
   
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [selectedTaskDefaultDates, setSelectedTaskDefaultDates] = useState<{start: string, end: string}>()
   
   const todayRef = useRef<HTMLDivElement>(null)
@@ -143,11 +144,11 @@ export default function TimesheetPage() {
         return
       }
 
-      // 2. If no entry, check if the task is planned for this day
-      if (!task.plannedStartDate || !task.plannedEndDate) return
+      // 2. If no entry, check if the task has actual dates for this day
+      if (!task.actualStartDate || !task.actualEndDate) return
       
-      const sDate = new Date(task.plannedStartDate)
-      const eDate = new Date(task.plannedEndDate)
+      const sDate = new Date(task.actualStartDate)
+      const eDate = new Date(task.actualEndDate)
       sDate.setHours(0,0,0,0)
       eDate.setHours(0,0,0,0)
       const cDate = new Date(day)
@@ -175,6 +176,12 @@ export default function TimesheetPage() {
   const openNewTask = (day: Date) => {
     const dStr = format(day, "yyyy-MM-dd")
     setSelectedTaskDefaultDates({ start: dStr, end: dStr })
+    setEditingTask(null)
+    setIsTaskDialogOpen(true)
+  }
+
+  const openEditTaskConfig = (task: Task) => {
+    setEditingTask(task)
     setIsTaskDialogOpen(true)
   }
 
@@ -299,6 +306,7 @@ export default function TimesheetPage() {
         <Button onClick={() => {
           const dStr = format(new Date(), "yyyy-MM-dd")
           setSelectedTaskDefaultDates({ start: dStr, end: dStr })
+          setEditingTask(null)
           setIsTaskDialogOpen(true)
         }}>
           <Plus className="mr-2 h-4 w-4" /> Nova Tarefa
@@ -384,6 +392,11 @@ export default function TimesheetPage() {
                     <div 
                       key={`${task.id}-${taskIdx}`} 
                       onClick={() => openLogTime(task, day, task.hoursToday)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openEditTaskConfig(task);
+                      }}
                       className={cn(
                         "text-[11px] p-2 rounded-md border shadow-sm flex flex-col gap-1 transition-all hover:border-primary cursor-pointer relative overflow-hidden",
                         task.isLogged ? "bg-primary/10 border-primary/30" : "bg-background hover:bg-muted/50 border-dashed"
@@ -418,8 +431,15 @@ export default function TimesheetPage() {
 
       <TaskFormDialog 
         open={isTaskDialogOpen} 
-        onOpenChange={setIsTaskDialogOpen}
+        onOpenChange={(open) => {
+          setIsTaskDialogOpen(open)
+          if (!open) {
+            setTimeout(() => setEditingTask(null), 200)
+          }
+        }}
+        editTask={editingTask}
         defaultDates={selectedTaskDefaultDates}
+        defaultUseActualDates={true}
         defaultProjectId={tasks?.[0]?.projectId}
       />
 
