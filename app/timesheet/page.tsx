@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useProjectStore, type Task, type TimesheetEntry } from "@/lib/store"
 import { useAuthStore } from "@/lib/auth-store"
 import {
@@ -20,7 +20,7 @@ import {
   isWeekend
 } from "date-fns"
 import { pt } from "date-fns/locale"
-import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Clock, Users } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,6 +49,7 @@ type ViewMode = "week" | "month"
 export default function TimesheetPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>("month")
+  const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
   
   const currentUser = useAuthStore((state) => state.user)
   const [selectedTechId, setSelectedTechId] = useState<string>(currentUser?.id || "")
@@ -62,7 +63,29 @@ export default function TimesheetPage() {
 
   const tasks = useProjectStore(state => state.tasks)
   const users = useProjectStore(state => state.users)
+  const meetings = useProjectStore(state => state.meetings)
   const updateTask = useProjectStore(state => state.updateTask)
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem("timesheetViewMode") as ViewMode | null
+    if (savedMode === "week" || savedMode === "month") {
+      setViewMode(savedMode)
+    }
+    const savedWeekStart = localStorage.getItem("timesheetWeekStartsOn")
+    if (savedWeekStart === "0" || savedWeekStart === "1") {
+      setWeekStartsOn(parseInt(savedWeekStart) as 0 | 1)
+    }
+  }, [])
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem("timesheetViewMode", mode)
+  }
+
+  const handleWeekStartsOnChange = (startsOn: 0 | 1) => {
+    setWeekStartsOn(startsOn)
+    localStorage.setItem("timesheetWeekStartsOn", startsOn.toString())
+  }
 
   // Navigate functions
   const next = () => {
@@ -80,23 +103,25 @@ export default function TimesheetPage() {
   // Generate calendar days
   const days = useMemo(() => {
     if (viewMode === "month") {
-      const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 })
-      const end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 })
+      const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn })
+      const end = endOfWeek(endOfMonth(currentDate), { weekStartsOn })
       return eachDayOfInterval({ start, end })
     } else {
-      const start = startOfWeek(currentDate, { weekStartsOn: 1 })
-      const end = endOfWeek(currentDate, { weekStartsOn: 1 })
+      const start = startOfWeek(currentDate, { weekStartsOn })
+      const end = endOfWeek(currentDate, { weekStartsOn })
       return eachDayOfInterval({ start, end })
     }
-  }, [currentDate, viewMode])
+  }, [currentDate, viewMode, weekStartsOn])
 
   // Process tasks mapped to days
   // Only for the selected technician
   const techTasks = tasks.filter(t => t.technicianId === selectedTechId)
+  const techMeetings = meetings.filter(m => m.technicians?.includes(selectedTechId))
 
   const getDayInfo = (day: Date) => {
     let dayCount = 0
     const dayTasks: (Task & { hoursToday: number, isLogged: boolean })[] = []
+    const dayMeetings: (any & { hoursToday: number })[] = []
     const dStr = format(day, "yyyy-MM-dd")
 
     techTasks.forEach(task => {
@@ -126,7 +151,15 @@ export default function TimesheetPage() {
       }
     })
 
-    return { totalHours: dayCount, tasks: dayTasks }
+    techMeetings.forEach(meeting => {
+      if (meeting.date === dStr) {
+        const hours = Number(meeting.durationHours) || 0
+        dayCount += hours
+        dayMeetings.push({ ...meeting, hoursToday: hours })
+      }
+    })
+
+    return { totalHours: dayCount, tasks: dayTasks, meetings: dayMeetings }
   }
 
   const openNewTask = (day: Date) => {
@@ -197,9 +230,28 @@ export default function TimesheetPage() {
           
           <div className="flex items-center bg-muted rounded-md p-1 border">
             <Button 
+              variant={weekStartsOn === 1 ? "default" : "ghost"} 
+              size="sm"
+              onClick={() => handleWeekStartsOnChange(1)}
+              className="text-xs"
+            >
+              Seg.
+            </Button>
+            <Button 
+              variant={weekStartsOn === 0 ? "default" : "ghost"} 
+              size="sm"
+              onClick={() => handleWeekStartsOnChange(0)}
+              className="text-xs"
+            >
+              Dom.
+            </Button>
+          </div>
+
+          <div className="flex items-center bg-muted rounded-md p-1 border">
+            <Button 
               variant={viewMode === "week" ? "default" : "ghost"} 
               size="sm"
-              onClick={() => setViewMode("week")}
+              onClick={() => handleViewModeChange("week")}
               className="text-xs"
             >
               Semana
@@ -207,7 +259,7 @@ export default function TimesheetPage() {
             <Button 
               variant={viewMode === "month" ? "default" : "ghost"} 
               size="sm"
-              onClick={() => setViewMode("month")}
+              onClick={() => handleViewModeChange("month")}
               className="text-xs"
             >
               Mês
@@ -231,7 +283,7 @@ export default function TimesheetPage() {
         <h2 className="text-xl font-semibold capitalize">
           {viewMode === "month" 
             ? format(currentDate, "MMMM yyyy", { locale: pt })
-            : `Semana de ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), "d MMM", { locale: pt })} a ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), "d MMM, yyyy", { locale: pt })}`
+            : `Semana de ${format(startOfWeek(currentDate, { weekStartsOn }), "d MMM", { locale: pt })} a ${format(endOfWeek(currentDate, { weekStartsOn }), "d MMM, yyyy", { locale: pt })}`
           }
         </h2>
         <Button onClick={() => {
@@ -245,11 +297,14 @@ export default function TimesheetPage() {
 
       <div className="flex-1 overflow-auto rounded-xl border bg-card shadow-sm flex flex-col">
         <div className="grid grid-cols-7 border-b bg-muted/40">
-          {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d, i) => (
-            <div key={d} className={cn("p-2 py-3 font-semibold text-center text-sm", i >= 5 && "text-muted-foreground/60")}>
-              {d}
-            </div>
-          ))}
+          {(weekStartsOn === 1 ? ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] : ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]).map((d, i) => {
+            const isWeekendDay = weekStartsOn === 1 ? i >= 5 : (i === 0 || i === 6)
+            return (
+              <div key={d} className={cn("p-2 py-3 font-semibold text-center text-sm", isWeekendDay && "text-muted-foreground/60")}>
+                {d}
+              </div>
+            )
+          })}
         </div>
         
         <div className={cn(
@@ -260,7 +315,7 @@ export default function TimesheetPage() {
             const isDiffMonth = viewMode === "month" && !isSameMonth(day, currentDate)
             const currentIsToday = isToday(day)
             const weekend = isWeekend(day)
-            const { totalHours, tasks: dayTasks } = getDayInfo(day)
+            const { totalHours, tasks: dayTasks, meetings: dayMeetings } = getDayInfo(day)
             
             const isOverbooked = totalHours > 8
 
@@ -276,12 +331,15 @@ export default function TimesheetPage() {
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className={cn(
-                    "text-sm font-bold w-8 h-8 flex items-center justify-center rounded-full mt-1 ml-1",
-                    currentIsToday ? "bg-primary text-primary-foreground shadow-sm" : ""
-                  )}>
+                  <button 
+                    onClick={() => openNewTask(day)}
+                    title="Adicionar tarefa neste dia"
+                    className={cn(
+                      "text-sm font-bold w-8 h-8 flex items-center justify-center rounded-full mt-1 ml-1 transition-colors hover:bg-muted cursor-pointer",
+                      currentIsToday ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90 hover:bg-primary" : ""
+                    )}>
                     {format(day, "d")}
-                  </span>
+                  </button>
                   
                   {totalHours > 0 && (
                     <Badge variant={isOverbooked ? "destructive" : "secondary"} className="text-xs font-mono mr-1">
@@ -291,6 +349,27 @@ export default function TimesheetPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar pb-8 z-10 w-full">
+                  {dayMeetings.map((mtg, mtgIdx) => (
+                    <div 
+                      key={`mtg-${mtg.id}-${mtgIdx}`} 
+                      className="text-[11px] p-2 rounded-md border shadow-sm flex flex-col gap-1 relative overflow-hidden bg-orange-100/50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-900 cursor-default"
+                      title={`${mtg.title} (${mtg.hoursToday.toFixed(1)}h)`}
+                    >
+                      <div className="flex justify-between items-start w-full">
+                        <span className="font-medium line-clamp-2 leading-tight pr-1 text-orange-800 dark:text-orange-200">
+                          <Users className="inline h-3 w-3 mr-1" />
+                          {mtg.title}
+                        </span>
+                        <span className="text-orange-700 dark:text-orange-300 font-mono bg-orange-200/50 dark:bg-orange-900/50 px-1 py-0.5 rounded text-[10px] flex-shrink-0 font-bold border border-orange-300/50">
+                          {mtg.hoursToday.toFixed(1)}h
+                        </span>
+                      </div>
+                      <span className="text-orange-600/80 dark:text-orange-400/80 text-[10px] truncate max-w-full block">
+                        {mtg.projectName || "Reunião"}
+                      </span>
+                    </div>
+                  ))}
+
                   {dayTasks.map((task, taskIdx) => (
                     <div 
                       key={`${task.id}-${taskIdx}`} 
@@ -321,20 +400,6 @@ export default function TimesheetPage() {
                     </div>
                   ))}
                 </div>
-
-                {!weekend && (
-                  <button 
-                    onClick={() => openNewTask(day)}
-                    title="Adicionar tarefa neste dia"
-                    className="absolute inset-0 w-full h-full opacity-0 group-hover/cell:opacity-100 bg-black/0 flex flex-col justify-end transition-all cursor-pointer z-0 pointer-events-auto"
-                  >
-                    <div className="flex justify-center pb-2 translate-y-4 group-hover/cell:translate-y-0 transition-transform duration-200">
-                      <div className="bg-primary text-primary-foreground shadow-md rounded-full p-2 hover:scale-110 transition-transform">
-                        <Plus className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </button>
-                )}
               </div>
             )
           })}
