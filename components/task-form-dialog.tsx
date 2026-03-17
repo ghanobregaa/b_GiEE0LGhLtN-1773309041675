@@ -146,9 +146,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
     formData.name &&
     formData.technicianId &&
     formData.requester &&
-    formData.plannedStartDate &&
-    formData.plannedEndDate &&
-    formData.plannedHours > 0
+    (formData.status === "Pendente" || 
+      (formData.plannedStartDate && formData.plannedEndDate && formData.plannedHours > 0))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -297,7 +296,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
             <h4 className="text-sm font-medium">Datas Previstas</h4>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2 flex flex-col">
-                <Label htmlFor="plannedStartDate">Data Início</Label>
+                <Label htmlFor="plannedStartDate">Data Início {formData.status !== "Pendente" && <span className="text-destructive">*</span>}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -319,6 +318,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                     <Calendar
                       mode="single"
                       selected={formData.plannedStartDate ? new Date(formData.plannedStartDate) : undefined}
+                      defaultMonth={formData.plannedStartDate ? new Date(formData.plannedStartDate) : new Date()}
                       onSelect={(date) => {
                         const newStart = date ? format(date, "yyyy-MM-dd") : ""
                         const hours = calculateBusinessHours(newStart, formData.plannedEndDate)
@@ -335,7 +335,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
               </div>
 
               <div className="space-y-2 flex flex-col">
-                <Label htmlFor="plannedEndDate">Data Fim</Label>
+                <Label htmlFor="plannedEndDate">Data Fim {formData.status !== "Pendente" && <span className="text-destructive">*</span>}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -357,6 +357,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                     <Calendar
                       mode="single"
                       selected={formData.plannedEndDate ? new Date(formData.plannedEndDate) : undefined}
+                      defaultMonth={formData.plannedEndDate ? new Date(formData.plannedEndDate) : new Date()}
                       onSelect={(date) => {
                         const newEnd = date ? format(date, "yyyy-MM-dd") : ""
                         const hours = calculateBusinessHours(formData.plannedStartDate, newEnd)
@@ -373,7 +374,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="plannedHours">Horas Previstas</Label>
+                <Label htmlFor="plannedHours">Horas Previstas {formData.status !== "Pendente" && <span className="text-destructive">*</span>}</Label>
                 <Input
                   id="plannedHours"
                   type="number"
@@ -381,7 +382,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                   value={formData.plannedHours || ""}
                   onChange={(e) => setFormData({ ...formData, plannedHours: parseInt(e.target.value) || 0 })}
                   placeholder="0"
-                  required
+                  required={formData.status !== "Pendente"}
                 />
               </div>
             </div>
@@ -427,6 +428,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                       <Calendar
                         mode="single"
                         selected={formData.actualStartDate ? new Date(formData.actualStartDate) : undefined}
+                        defaultMonth={formData.actualStartDate ? new Date(formData.actualStartDate) : new Date()}
                         onSelect={(date) =>
                           setFormData({ ...formData, actualStartDate: date ? format(date, "yyyy-MM-dd") : "" })
                         }
@@ -459,6 +461,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                       <Calendar
                         mode="single"
                         selected={formData.actualEndDate ? new Date(formData.actualEndDate) : undefined}
+                        defaultMonth={formData.actualEndDate ? new Date(formData.actualEndDate) : new Date()}
                         onSelect={(date) =>
                           setFormData({ ...formData, actualEndDate: date ? format(date, "yyyy-MM-dd") : "" })
                         }

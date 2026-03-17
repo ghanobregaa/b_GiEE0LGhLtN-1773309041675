@@ -7,6 +7,8 @@ import { useProjectStore } from "@/lib/store"
 import { useAuthStore } from "@/lib/auth-store"
 import { useRouter, usePathname } from "next/navigation"
 import { getApiUrl } from "@/lib/api-config"
+import { useUIStore } from "@/lib/ui-store"
+import { cn } from "@/lib/utils"
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -17,6 +19,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isLoading = useProjectStore((state) => state.isLoading)
   const error = useProjectStore((state) => state.error)
   const { isAuthenticated, _hasHydrated } = useAuthStore()
+  const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -56,7 +59,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppSidebar />
-      <div className="pl-64 flex flex-col min-h-screen">
+      <div className={cn("transition-all duration-300 flex flex-col min-h-screen", isSidebarCollapsed ? "pl-16" : "pl-64")}>
         <AppHeader />
         <main className="p-6 flex-1">
           {isLoading ? (
