@@ -49,6 +49,11 @@ export interface Phase {
   actualHours?: number
 }
 
+export interface TimesheetEntry {
+  date: string
+  hours: number
+}
+
 export interface Task {
   id: string
   projectId: string
@@ -65,6 +70,7 @@ export interface Task {
   actualEndDate?: string
   actualHours?: number
   status: TaskStatus
+  timesheetEntries?: TimesheetEntry[]
 }
 
 export type Company = "SAVOY" | "AFA"

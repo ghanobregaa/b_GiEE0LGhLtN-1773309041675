@@ -39,9 +39,10 @@ interface TaskFormDialogProps {
   onOpenChange: (open: boolean) => void
   editTask?: Task | null
   defaultProjectId?: string
+  defaultDates?: { start: string, end: string }
 }
 
-export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId }: TaskFormDialogProps) {
+export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId, defaultDates }: TaskFormDialogProps) {
   const projects = useProjectStore((state) => state.projects)
   const users = useProjectStore((state) => state.users)
   const addTask = useProjectStore((state) => state.addTask)
@@ -94,9 +95,9 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId 
           ticket: "",
           technicianId: currentUser?.id || "",
           requester: "",
-          plannedStartDate: "",
-          plannedEndDate: "",
-          plannedHours: 0,
+          plannedStartDate: defaultDates?.start || "",
+          plannedEndDate: defaultDates?.end || "",
+          plannedHours: defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0,
           actualStartDate: "",
           actualEndDate: "",
           actualHours: 0,

@@ -82,6 +82,11 @@ ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS phase_id UUID REFERENCES phases(id) ON DELETE SET NULL;
 
+-- TODO
+-- ─── Adicionar timesheet_entries a tasks (run this se a tabela já existir) ──
+ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS timesheet_entries JSONB DEFAULT '[]'::jsonb;
+
 -- ─── Adicionar company a projects (run this if table already exists) ────────
 DO $$ BEGIN
     CREATE TYPE company_name AS ENUM ('SAVOY', 'AFA');

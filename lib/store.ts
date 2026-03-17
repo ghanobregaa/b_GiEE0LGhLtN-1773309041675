@@ -12,6 +12,7 @@ import {
   type User,
   type Meeting,
   type MeetingChecklistItem,
+  type TimesheetEntry,
 } from "./data"
 
 import { getApiUrl } from "./api-config"
@@ -76,6 +77,7 @@ const mapTask = (t: any): Task => ({
   actualStartDate: t.actual_start_date ?? undefined,
   actualEndDate: t.actual_end_date ?? undefined,
   actualHours: t.actual_hours != null ? Number(t.actual_hours) : undefined,
+  timesheetEntries: t.timesheet_entries || [],
 })
 
 const mapMeeting = (m: any): Meeting => ({
@@ -134,6 +136,7 @@ const taskToApi = (t: Partial<Task & { projectId?: string }>) => ({
   ...(t.actualEndDate !== undefined && { actual_end_date: t.actualEndDate }),
   ...(t.actualHours !== undefined && { actual_hours: t.actualHours }),
   ...(t.status !== undefined && { status: t.status }),
+  ...(t.timesheetEntries !== undefined && { timesheet_entries: t.timesheetEntries }),
 })
 
 const meetingToApi = (m: Partial<Meeting>) => ({
@@ -695,7 +698,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 }))
 
 // Re-export types and helper functions
-export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User, Meeting, MeetingChecklistItem }
+export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User, Meeting, MeetingChecklistItem, TimesheetEntry }
 export {
   formatDate,
   getStatusColor,
