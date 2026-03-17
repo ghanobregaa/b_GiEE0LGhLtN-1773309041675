@@ -45,6 +45,7 @@ interface TaskFormDialogProps {
 export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId, defaultDates }: TaskFormDialogProps) {
   const projects = useProjectStore((state) => state.projects)
   const users = useProjectStore((state) => state.users)
+  const tasks = useProjectStore((state) => state.tasks)
   const addTask = useProjectStore((state) => state.addTask)
   const updateTask = useProjectStore((state) => state.updateTask)
   const currentUser = useAuthStore((state) => state.user)
@@ -66,10 +67,12 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
     hasActualDates: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedPendingTaskId, setSelectedPendingTaskId] = useState<string>("")
 
   // Reset form when opening or when editTask changes
   useEffect(() => {
     if (open) {
+      setSelectedPendingTaskId("")
       if (editTask) {
         setFormData({
           projectId: editTask.projectId,
@@ -130,6 +133,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
 
     if (editTask) {
       await updateTask(editTask.id, taskData)
+    } else if (selectedPendingTaskId && selectedPendingTaskId !== "new") {
+      await updateTask(selectedPendingTaskId, taskData)
     } else {
       await addTask(taskData)
     }
@@ -140,6 +145,14 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
 
   const selectedProject = projects.find((p) => p.id === formData.projectId)
   const phases = selectedProject?.phases || []
+
+  // Pending tasks for the selected project and technician
+  const pendingTasks = tasks.filter(
+    (t) => 
+      t.projectId === formData.projectId && 
+      t.status === "Pendente" && 
+      t.technicianId === formData.technicianId
+  )
 
   const isValid =
     formData.projectId &&
@@ -213,6 +226,55 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
               </Select>
             </div>
           </div>
+
+          {/* Pending Tasks Selection */}
+          {!editTask && formData.projectId && pendingTasks.length > 0 && (
+            <div className="space-y-2 p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/50">
+              <Label htmlFor="pendingTask" className="text-orange-800 dark:text-orange-400 font-semibold">
+                Tem tarefas pendentes neste projeto. Deseja planear alguma?
+              </Label>
+              <Select
+                value={selectedPendingTaskId}
+                onValueChange={(value) => {
+                  setSelectedPendingTaskId(value);
+                  if (value && value !== "new") {
+                    const task = tasks.find(t => t.id === value);
+                    if (task) {
+                      setFormData({
+                        ...formData,
+                        phaseId: task.phaseId || "",
+                        name: task.name,
+                        ticket: task.ticket || "",
+                        requester: task.requester,
+                        status: task.status,
+                      });
+                    }
+                  } else {
+                    // Reset to blank task details but keep project/technician/dates
+                    setFormData({
+                      ...formData,
+                      phaseId: "",
+                      name: "",
+                      ticket: "",
+                      status: "Pendente",
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-white dark:bg-background">
+                  <SelectValue placeholder="Selecione uma tarefa pendente ou continue com uma nova" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new" className="font-semibold text-primary">-- Criar Nova Tarefa Livre --</SelectItem>
+                  {pendingTasks.map((task) => (
+                    <SelectItem key={task.id} value={task.id}>
+                      {task.name} {task.ticket ? `(${task.ticket})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Task Details */}
           <div className="grid grid-cols-2 gap-4">
