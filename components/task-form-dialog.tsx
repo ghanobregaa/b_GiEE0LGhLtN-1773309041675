@@ -117,6 +117,48 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
     e.preventDefault()
     setIsSubmitting(true)
 
+    const calculateDistributedEntries = (startStr: string, endStr: string, total: number) => {
+      const dates: string[] = []
+      const start = new Date(startStr)
+      start.setHours(0, 0, 0, 0)
+      const end = new Date(endStr)
+      end.setHours(0, 0, 0, 0)
+
+      const curr = new Date(start)
+      while (curr <= end) {
+        const dow = curr.getDay()
+        if (dow !== 0 && dow !== 6) {
+          dates.push(format(curr, "yyyy-MM-dd"))
+        }
+        curr.setDate(curr.getDate() + 1)
+      }
+
+      if (dates.length === 0) return []
+
+      const numDays = dates.length
+      const baseHours = Math.floor((total / numDays) * 2) / 2
+      let remaining = total - (baseHours * numDays)
+      
+      const entries = dates.map(date => ({ date, hours: baseHours }))
+
+      let idx = 0
+      while (remaining > 0 && idx < entries.length) {
+        entries[idx].hours += 0.5
+        remaining -= 0.5
+        idx++
+      }
+
+      return entries.filter(e => e.hours > 0)
+    }
+
+    let timesheetEntries: { date: string, hours: number }[] | undefined = undefined;
+    
+    if (formData.hasActualDates && formData.actualStartDate && formData.actualEndDate && formData.actualHours > 0) {
+      timesheetEntries = calculateDistributedEntries(formData.actualStartDate, formData.actualEndDate, formData.actualHours);
+    } else if (!formData.hasActualDates) {
+      timesheetEntries = [];
+    }
+
     const taskData = {
       projectId: formData.projectId,
       phaseId: formData.phaseId === "none" ? undefined : (formData.phaseId || undefined),
@@ -131,6 +173,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
       actualEndDate: formData.hasActualDates && formData.actualEndDate ? formData.actualEndDate : undefined,
       actualHours: formData.hasActualDates && formData.actualHours ? formData.actualHours : undefined,
       status: formData.status,
+      ...(timesheetEntries !== undefined && { timesheetEntries }),
     }
 
     if (editTask) {
