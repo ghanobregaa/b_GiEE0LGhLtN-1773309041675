@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/select"
 import { format } from "date-fns"
 import { pt } from "date-fns/locale"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { DateRange } from "react-day-picker"
+import { useAuthStore } from "@/lib/auth-store"
 
 export function HolidaysVacationsManager() {
   const users = useProjectStore((state) => state.users)
@@ -28,17 +34,17 @@ export function HolidaysVacationsManager() {
   const addVacation = useProjectStore((state) => state.addVacation)
   const deleteVacation = useProjectStore((state) => state.deleteVacation)
 
+  const { user: currentUser } = useAuthStore()
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Holiday states
   const [newHolidayName, setNewHolidayName] = useState("")
-  const [newHolidayDate, setNewHolidayDate] = useState("")
+  const [newHolidayDate, setNewHolidayDate] = useState<Date | undefined>()
 
   // Vacation states
-  const [vacationUserId, setVacationUserId] = useState("")
-  const [vacationStartDate, setVacationStartDate] = useState("")
-  const [vacationEndDate, setVacationEndDate] = useState("")
+  const [vacationDateRange, setVacationDateRange] = useState<DateRange | undefined>()
 
   const handleAddHoliday = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,10 +54,10 @@ export function HolidaysVacationsManager() {
     try {
       await addHoliday({
         name: newHolidayName,
-        date: newHolidayDate,
+        date: format(newHolidayDate, "yyyy-MM-dd"),
       })
       setNewHolidayName("")
-      setNewHolidayDate("")
+      setNewHolidayDate(undefined)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -74,22 +80,16 @@ export function HolidaysVacationsManager() {
 
   const handleAddVacation = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!vacationUserId || !vacationStartDate || !vacationEndDate) return
-    if (vacationStartDate > vacationEndDate) {
-      setError("A data de fim deve ser posterior ou igual à data de início.")
-      return
-    }
+    if (!currentUser || !vacationDateRange?.from || !vacationDateRange?.to) return
     setLoading(true)
     setError(null)
     try {
       await addVacation({
-        technicianId: vacationUserId,
-        startDate: vacationStartDate,
-        endDate: vacationEndDate,
+        technicianId: currentUser.id,
+        startDate: format(vacationDateRange.from, "yyyy-MM-dd"),
+        endDate: format(vacationDateRange.to, "yyyy-MM-dd"),
       })
-      setVacationUserId("")
-      setVacationStartDate("")
-      setVacationEndDate("")
+      setVacationDateRange(undefined)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -139,12 +139,28 @@ export function HolidaysVacationsManager() {
                 />
               </div>
               <div className="space-y-2">
-                <Input
-                  type="date"
-                  value={newHolidayDate}
-                  onChange={(e) => setNewHolidayDate(e.target.value)}
-                  required
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newHolidayDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newHolidayDate ? format(newHolidayDate, "PPP", { locale: pt }) : <span>Selecione a data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newHolidayDate}
+                      onSelect={setNewHolidayDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
@@ -210,40 +226,44 @@ export function HolidaysVacationsManager() {
         <CardContent>
           <form onSubmit={handleAddVacation} className="space-y-4 mb-6">
             <div className="space-y-2">
-              <Select value={vacationUserId} onValueChange={setVacationUserId} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um utilizador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.filter(u => u.role === "técnico").map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-sm font-medium">Período de Férias</p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !vacationDateRange && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {vacationDateRange?.from ? (
+                      vacationDateRange.to ? (
+                        <>
+                          {format(vacationDateRange.from, "LLL dd, y", { locale: pt })} -{" "}
+                          {format(vacationDateRange.to, "LLL dd, y", { locale: pt })}
+                        </>
+                      ) : (
+                        format(vacationDateRange.from, "LLL dd, y", { locale: pt })
+                      )
+                    ) : (
+                      <span>Selecione o período das suas férias</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={vacationDateRange?.from}
+                    selected={vacationDateRange}
+                    onSelect={setVacationDateRange}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Início</p>
-                <Input
-                  type="date"
-                  value={vacationStartDate}
-                  onChange={(e) => setVacationStartDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Fim</p>
-                <Input
-                  type="date"
-                  value={vacationEndDate}
-                  onChange={(e) => setVacationEndDate(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !vacationDateRange?.from || !vacationDateRange?.to}>
               <Plus className="h-4 w-4 mr-2" /> Registar Férias
             </Button>
           </form>
@@ -265,10 +285,12 @@ export function HolidaysVacationsManager() {
                     </TableCell>
                   </TableRow>
                 )}
-                {vacations.map((v) => (
+                {vacations
+                  .filter((v) => v.technicianId === currentUser?.id)
+                  .map((v) => (
                   <TableRow key={v.id}>
                     <TableCell className="font-medium">
-                      {getTechName(v.technicianId)}
+                      {(currentUser?.name || "") + " (Tu)"}
                     </TableCell>
                     <TableCell className="text-sm font-mono whitespace-nowrap">
                       {format(new Date(v.startDate), "dd/MM/yy")} - {format(new Date(v.endDate), "dd/MM/yy")}
