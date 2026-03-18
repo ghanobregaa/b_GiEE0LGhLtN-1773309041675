@@ -23,6 +23,7 @@ import { cn, calculateBusinessHours } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DateRange } from "react-day-picker"
 import {
   Select,
   SelectContent,
@@ -99,9 +100,9 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
           ticket: "",
           technicianId: currentUser?.id || "",
           requester: "",
-          plannedStartDate: defaultUseActualDates ? "" : (defaultDates?.start || ""),
-          plannedEndDate: defaultUseActualDates ? "" : (defaultDates?.end || ""),
-          plannedHours: defaultUseActualDates ? 0 : (defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0),
+          plannedStartDate: defaultDates?.start || "",
+          plannedEndDate: defaultDates?.end || "",
+          plannedHours: defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0,
           actualStartDate: defaultUseActualDates ? (defaultDates?.start || "") : "",
           actualEndDate: defaultUseActualDates ? (defaultDates?.end || "") : "",
           actualHours: defaultUseActualDates ? (defaultDates ? calculateBusinessHours(defaultDates.start, defaultDates.end) : 0) : 0,
@@ -357,75 +358,49 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
           {/* Planned Dates */}
           <div className="space-y-3">
             <h4 className="text-sm font-medium">Datas Previstas</h4>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2 flex flex-col">
-                <Label htmlFor="plannedStartDate">Data Início {formData.status !== "Pendente" && <span className="text-destructive">*</span>}</Label>
+                <Label htmlFor="plannedDates">Período Previsto {formData.status !== "Pendente" && <span className="text-destructive">*</span>}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={"outline"}
                       className={cn(
                         "w-full pl-3 text-left font-normal",
-                        !formData.plannedStartDate && "text-muted-foreground"
+                        !(formData.plannedStartDate || formData.plannedEndDate) && "text-muted-foreground"
                       )}
                     >
                       {formData.plannedStartDate ? (
-                        format(new Date(formData.plannedStartDate), "PPP", { locale: pt })
+                        formData.plannedEndDate ? (
+                          <>
+                            {format(new Date(formData.plannedStartDate), "dd/MM/yy")} -{" "}
+                            {format(new Date(formData.plannedEndDate), "dd/MM/yy")}
+                          </>
+                        ) : (
+                          format(new Date(formData.plannedStartDate), "dd/MM/yy")
+                        )
                       ) : (
-                        <span>Data</span>
+                        <span>Período</span>
                       )}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      mode="single"
-                      selected={formData.plannedStartDate ? new Date(formData.plannedStartDate) : undefined}
+                      mode="range"
+                      numberOfMonths={1}
+                      selected={{
+                        from: formData.plannedStartDate ? new Date(formData.plannedStartDate) : undefined,
+                        to: formData.plannedEndDate ? new Date(formData.plannedEndDate) : undefined
+                      }}
                       defaultMonth={formData.plannedStartDate ? new Date(formData.plannedStartDate) : new Date()}
-                      onSelect={(date) => {
-                        const newStart = date ? format(date, "yyyy-MM-dd") : ""
-                        const hours = calculateBusinessHours(newStart, formData.plannedEndDate)
+                      onSelect={(range) => {
+                        const newStart = range?.from ? format(range.from, "yyyy-MM-dd") : ""
+                        const newEnd = range?.to ? format(range.to, "yyyy-MM-dd") : ""
+                        const hours = calculateBusinessHours(newStart, newEnd)
                         setFormData({
                           ...formData,
                           plannedStartDate: newStart,
-                          plannedHours: hours > 0 ? hours : formData.plannedHours
-                        })
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2 flex flex-col">
-                <Label htmlFor="plannedEndDate">Data Fim {formData.status !== "Pendente" && <span className="text-destructive">*</span>}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !formData.plannedEndDate && "text-muted-foreground"
-                      )}
-                    >
-                      {formData.plannedEndDate ? (
-                        format(new Date(formData.plannedEndDate), "PPP", { locale: pt })
-                      ) : (
-                        <span>Data</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.plannedEndDate ? new Date(formData.plannedEndDate) : undefined}
-                      defaultMonth={formData.plannedEndDate ? new Date(formData.plannedEndDate) : new Date()}
-                      onSelect={(date) => {
-                        const newEnd = date ? format(date, "yyyy-MM-dd") : ""
-                        const hours = calculateBusinessHours(formData.plannedStartDate, newEnd)
-                        setFormData({
-                          ...formData,
                           plannedEndDate: newEnd,
                           plannedHours: hours > 0 ? hours : formData.plannedHours
                         })
@@ -467,67 +442,53 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
             </div>
 
             {formData.hasActualDates && (
-              <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30">
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
                 <div className="space-y-2 flex flex-col">
-                  <Label htmlFor="actualStartDate">Data Início Real</Label>
+                  <Label htmlFor="actualDates">Período Real</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant={"outline"}
                         className={cn(
                           "w-full pl-3 text-left font-normal",
-                          !formData.actualStartDate && "text-muted-foreground"
+                          !(formData.actualStartDate || formData.actualEndDate) && "text-muted-foreground"
                         )}
                       >
                         {formData.actualStartDate ? (
-                          format(new Date(formData.actualStartDate), "dd/MM/yy")
+                          formData.actualEndDate ? (
+                            <>
+                              {format(new Date(formData.actualStartDate), "dd/MM/yy")} -{" "}
+                              {format(new Date(formData.actualEndDate), "dd/MM/yy")}
+                            </>
+                          ) : (
+                            format(new Date(formData.actualStartDate), "dd/MM/yy")
+                          )
                         ) : (
-                          <span>Data</span>
+                          <span>Período</span>
                         )}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
-                        mode="single"
-                        selected={formData.actualStartDate ? new Date(formData.actualStartDate) : undefined}
+                        mode="range"
+                        numberOfMonths={1}
+                        selected={{
+                          from: formData.actualStartDate ? new Date(formData.actualStartDate) : undefined,
+                          to: formData.actualEndDate ? new Date(formData.actualEndDate) : undefined
+                        }}
                         defaultMonth={formData.actualStartDate ? new Date(formData.actualStartDate) : new Date()}
-                        onSelect={(date) =>
-                          setFormData({ ...formData, actualStartDate: date ? format(date, "yyyy-MM-dd") : "" })
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2 flex flex-col">
-                  <Label htmlFor="actualEndDate">Data Fim Real</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !formData.actualEndDate && "text-muted-foreground"
-                        )}
-                      >
-                        {formData.actualEndDate ? (
-                          format(new Date(formData.actualEndDate), "dd/MM/yy")
-                        ) : (
-                          <span>Data</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={formData.actualEndDate ? new Date(formData.actualEndDate) : undefined}
-                        defaultMonth={formData.actualEndDate ? new Date(formData.actualEndDate) : new Date()}
-                        onSelect={(date) =>
-                          setFormData({ ...formData, actualEndDate: date ? format(date, "yyyy-MM-dd") : "" })
-                        }
+                        onSelect={(range) => {
+                          const newStart = range?.from ? format(range.from, "yyyy-MM-dd") : ""
+                          const newEnd = range?.to ? format(range.to, "yyyy-MM-dd") : ""
+                          const hours = calculateBusinessHours(newStart, newEnd)
+                          setFormData({ 
+                            ...formData, 
+                            actualStartDate: newStart,
+                            actualEndDate: newEnd,
+                            actualHours: hours > 0 ? hours : formData.actualHours
+                          })
+                        }}
                         initialFocus
                       />
                     </PopoverContent>

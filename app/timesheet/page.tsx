@@ -51,14 +51,14 @@ export default function TimesheetPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>("month")
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(1)
-  
+
   const currentUser = useAuthStore((state) => state.user)
   const [selectedTechId, setSelectedTechId] = useState<string>(currentUser?.id || "")
-  
+
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
-  const [selectedTaskDefaultDates, setSelectedTaskDefaultDates] = useState<{start: string, end: string}>()
-  
+  const [selectedTaskDefaultDates, setSelectedTaskDefaultDates] = useState<{ start: string, end: string }>()
+
   const todayRef = useRef<HTMLDivElement>(null)
 
   // Log time dialog state
@@ -139,9 +139,9 @@ export default function TimesheetPage() {
     const dStr = format(day, "yyyy-MM-dd")
 
     const holiday = holidays.find(h => h.date === dStr)
-    const vacation = vacations.find(v => 
-      v.technicianId === selectedTechId && 
-      dStr >= v.startDate && 
+    const vacation = vacations.find(v =>
+      v.technicianId === selectedTechId &&
+      dStr >= v.startDate &&
       dStr <= v.endDate
     )
 
@@ -156,13 +156,13 @@ export default function TimesheetPage() {
 
       // 2. If no entry, check if the task has actual dates for this day
       if (!task.actualStartDate || !task.actualEndDate) return
-      
+
       const sDate = new Date(task.actualStartDate)
       const eDate = new Date(task.actualEndDate)
-      sDate.setHours(0,0,0,0)
-      eDate.setHours(0,0,0,0)
+      sDate.setHours(0, 0, 0, 0)
+      eDate.setHours(0, 0, 0, 0)
       const cDate = new Date(day)
-      cDate.setHours(0,0,0,0)
+      cDate.setHours(0, 0, 0, 0)
 
       if (cDate >= sDate && cDate <= eDate) {
         // Only show tentative on business days
@@ -207,11 +207,11 @@ export default function TimesheetPage() {
   const handleSaveTime = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!logTimeData.task) return
-    
+
     const task = logTimeData.task
     let newEntries = [...(task.timesheetEntries || [])]
     const existingIndex = newEntries.findIndex(e => e.date === logTimeData.date)
-    
+
     if (existingIndex >= 0) {
       if (logTimeData.hours > 0) {
         newEntries[existingIndex].hours = logTimeData.hours
@@ -237,7 +237,7 @@ export default function TimesheetPage() {
             Registo de tarefas e horas diárias
           </p>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground mr-2">Técnico:</span>
@@ -254,18 +254,18 @@ export default function TimesheetPage() {
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="flex items-center bg-muted rounded-md p-1 border">
-            <Button 
-              variant={weekStartsOn === 1 ? "default" : "ghost"} 
+            <Button
+              variant={weekStartsOn === 1 ? "default" : "ghost"}
               size="sm"
               onClick={() => handleWeekStartsOnChange(1)}
               className="text-xs"
             >
               Seg.
             </Button>
-            <Button 
-              variant={weekStartsOn === 0 ? "default" : "ghost"} 
+            <Button
+              variant={weekStartsOn === 0 ? "default" : "ghost"}
               size="sm"
               onClick={() => handleWeekStartsOnChange(0)}
               className="text-xs"
@@ -275,16 +275,16 @@ export default function TimesheetPage() {
           </div>
 
           <div className="flex items-center bg-muted rounded-md p-1 border">
-            <Button 
-              variant={viewMode === "week" ? "default" : "ghost"} 
+            <Button
+              variant={viewMode === "week" ? "default" : "ghost"}
               size="sm"
               onClick={() => handleViewModeChange("week")}
               className="text-xs"
             >
               Semana
             </Button>
-            <Button 
-              variant={viewMode === "month" ? "default" : "ghost"} 
+            <Button
+              variant={viewMode === "month" ? "default" : "ghost"}
               size="sm"
               onClick={() => handleViewModeChange("month")}
               className="text-xs"
@@ -308,7 +308,7 @@ export default function TimesheetPage() {
           </Button>
         </div>
         <h2 className="text-xl font-semibold capitalize">
-          {viewMode === "month" 
+          {viewMode === "month"
             ? format(currentDate, "MMMM yyyy", { locale: pt })
             : `Semana de ${format(startOfWeek(currentDate, { weekStartsOn }), "d MMM", { locale: pt })} a ${format(endOfWeek(currentDate, { weekStartsOn }), "d MMM, yyyy", { locale: pt })}`
           }
@@ -334,7 +334,7 @@ export default function TimesheetPage() {
             )
           })}
         </div>
-        
+
         <div className={cn(
           "grid grid-cols-7 flex-1",
           viewMode === "month" ? "auto-rows-fr" : "auto-rows-fr min-h-[400px]"
@@ -344,13 +344,13 @@ export default function TimesheetPage() {
             const currentIsToday = isToday(day)
             const weekend = isWeekend(day)
             const { totalHours, tasks: dayTasks, meetings: dayMeetings, holiday, vacation } = getDayInfo(day)
-            
+
             const isOverbooked = totalHours > 8
             const isBlocked = holiday || vacation
 
             return (
-              <div 
-                key={day.toISOString()} 
+              <div
+                key={day.toISOString()}
                 ref={currentIsToday ? todayRef : null}
                 className={cn(
                   "border-r border-b min-h-[140px] p-2 flex flex-col relative group/cell transition-colors overflow-hidden",
@@ -361,7 +361,7 @@ export default function TimesheetPage() {
                 )}
               >
                 <div className="flex items-center justify-between mb-2 z-10">
-                  <button 
+                  <button
                     onClick={() => openNewTask(day)}
                     title="Adicionar tarefa neste dia"
                     disabled={!!isBlocked}
@@ -372,7 +372,7 @@ export default function TimesheetPage() {
                     )}>
                     {format(day, "d")}
                   </button>
-                  
+
                   {totalHours > 0 && (
                     <Badge variant={isOverbooked ? "destructive" : "secondary"} className="text-xs font-mono mr-1">
                       {totalHours.toFixed(1)}h {isOverbooked && "(!)"}
@@ -396,10 +396,10 @@ export default function TimesheetPage() {
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar pb-8 z-10 w-full mt-2">
+                <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pb-1 pr-1 z-10 w-full mt-2 max-h-[210px]">
                   {dayMeetings.map((mtg, mtgIdx) => (
-                    <div 
-                      key={`mtg-${mtg.id}-${mtgIdx}`} 
+                    <div
+                      key={`mtg-${mtg.id}-${mtgIdx}`}
                       className="text-[11px] p-2 rounded-md border shadow-sm flex flex-col gap-1 relative overflow-hidden bg-orange-100/50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-900 cursor-default"
                       title={`${mtg.title} (${mtg.hoursToday.toFixed(1)}h)`}
                     >
@@ -419,8 +419,8 @@ export default function TimesheetPage() {
                   ))}
 
                   {dayTasks.map((task, taskIdx) => (
-                    <div 
-                      key={`${task.id}-${taskIdx}`} 
+                    <div
+                      key={`${task.id}-${taskIdx}`}
                       onClick={() => openLogTime(task, day, task.hoursToday)}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -459,8 +459,8 @@ export default function TimesheetPage() {
         </div>
       </div>
 
-      <TaskFormDialog 
-        open={isTaskDialogOpen} 
+      <TaskFormDialog
+        open={isTaskDialogOpen}
         onOpenChange={(open) => {
           setIsTaskDialogOpen(open)
           if (!open) {
