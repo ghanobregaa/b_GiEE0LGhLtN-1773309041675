@@ -73,6 +73,19 @@ export interface Task {
   timesheetEntries?: TimesheetEntry[]
 }
 
+export interface Holiday {
+  id: string
+  date: string
+  name: string
+}
+
+export interface Vacation {
+  id: string
+  technicianId: string
+  startDate: string
+  endDate: string
+}
+
 export type Company = "SAVOY" | "AFA"
 
 export interface Project {

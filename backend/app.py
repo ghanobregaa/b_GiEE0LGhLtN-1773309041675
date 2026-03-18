@@ -690,5 +690,68 @@ def delete_user(id):
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+# ─── HOLIDAYS (Feriados) ──────────────────────────────────────────────────────
+
+@app.route('/api/holidays', methods=['GET'])
+def get_holidays():
+    try:
+        res = supabase.table("holidays").select("*").order("date").execute()
+        return jsonify(res.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/holidays', methods=['POST'])
+def create_holiday():
+    try:
+        data = request.json
+        payload = {
+            "date": data.get("date"),
+            "name": data.get("name")
+        }
+        res = supabase.table("holidays").insert(payload).execute()
+        return jsonify(res.data[0] if res.data else {}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/holidays/<id>', methods=['DELETE'])
+def delete_holiday(id):
+    try:
+        supabase.table("holidays").delete().eq("id", id).execute()
+        return '', 204
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+# ─── VACATIONS (Férias) ───────────────────────────────────────────────────────
+
+@app.route('/api/vacations', methods=['GET'])
+def get_vacations():
+    try:
+        res = supabase.table("vacations").select("*").execute()
+        return jsonify(res.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/vacations', methods=['POST'])
+def create_vacation():
+    try:
+        data = request.json
+        payload = {
+            "technician_id": data.get("technician_id"),
+            "start_date": data.get("start_date"),
+            "end_date": data.get("end_date")
+        }
+        res = supabase.table("vacations").insert(payload).execute()
+        return jsonify(res.data[0] if res.data else {}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/vacations/<id>', methods=['DELETE'])
+def delete_vacation(id):
+    try:
+        supabase.table("vacations").delete().eq("id", id).execute()
+        return '', 204
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

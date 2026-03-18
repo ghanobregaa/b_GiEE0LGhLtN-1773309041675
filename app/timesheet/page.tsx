@@ -17,7 +17,8 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
-  isWeekend
+  isWeekend,
+  startOfDay
 } from "date-fns"
 import { pt } from "date-fns/locale"
 import { ChevronLeft, ChevronRight, Plus, Clock, Users } from "lucide-react"
@@ -67,6 +68,8 @@ export default function TimesheetPage() {
   const tasks = useProjectStore(state => state.tasks)
   const users = useProjectStore(state => state.users)
   const meetings = useProjectStore(state => state.meetings)
+  const holidays = useProjectStore(state => state.holidays)
+  const vacations = useProjectStore(state => state.vacations)
   const updateTask = useProjectStore(state => state.updateTask)
 
   useEffect(() => {
@@ -135,6 +138,13 @@ export default function TimesheetPage() {
     const dayMeetings: (any & { hoursToday: number })[] = []
     const dStr = format(day, "yyyy-MM-dd")
 
+    const holiday = holidays.find(h => h.date === dStr)
+    const vacation = vacations.find(v => 
+      v.technicianId === selectedTechId && 
+      dStr >= v.startDate && 
+      dStr <= v.endDate
+    )
+
     techTasks.forEach(task => {
       // 1. Check if there is an explicit timesheet entry for this day
       const entry = task.timesheetEntries?.find(e => e.date === dStr)
@@ -170,7 +180,7 @@ export default function TimesheetPage() {
       }
     })
 
-    return { totalHours: dayCount, tasks: dayTasks, meetings: dayMeetings }
+    return { totalHours: dayCount, tasks: dayTasks, meetings: dayMeetings, holiday, vacation }
   }
 
   const openNewTask = (day: Date) => {
@@ -333,9 +343,10 @@ export default function TimesheetPage() {
             const isDiffMonth = viewMode === "month" && !isSameMonth(day, currentDate)
             const currentIsToday = isToday(day)
             const weekend = isWeekend(day)
-            const { totalHours, tasks: dayTasks, meetings: dayMeetings } = getDayInfo(day)
+            const { totalHours, tasks: dayTasks, meetings: dayMeetings, holiday, vacation } = getDayInfo(day)
             
             const isOverbooked = totalHours > 8
+            const isBlocked = holiday || vacation
 
             return (
               <div 
@@ -345,16 +356,19 @@ export default function TimesheetPage() {
                   "border-r border-b min-h-[140px] p-2 flex flex-col relative group/cell transition-colors overflow-hidden",
                   weekend ? "bg-muted/60 dark:bg-muted/20" : "bg-background hover:bg-muted/20",
                   isDiffMonth && "opacity-40 grayscale-[30%]",
-                  currentIsToday && "bg-primary/5 ring-1 ring-primary/40 ring-inset z-10"
+                  currentIsToday && "bg-primary/5 ring-1 ring-primary/40 ring-inset z-10",
+                  isBlocked && "bg-red-50/50 dark:bg-red-950/20"
                 )}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 z-10">
                   <button 
                     onClick={() => openNewTask(day)}
                     title="Adicionar tarefa neste dia"
+                    disabled={!!isBlocked}
                     className={cn(
                       "text-sm font-bold w-8 h-8 flex items-center justify-center rounded-full mt-1 ml-1 transition-colors hover:bg-muted cursor-pointer",
-                      currentIsToday ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90 hover:bg-primary" : ""
+                      currentIsToday ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90 hover:bg-primary" : "",
+                      isBlocked ? "opacity-50 cursor-not-allowed hover:bg-transparent" : ""
                     )}>
                     {format(day, "d")}
                   </button>
@@ -366,7 +380,23 @@ export default function TimesheetPage() {
                   )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar pb-8 z-10 w-full">
+                {/* Bloco de Feriado/Férias visual */}
+                {holiday && (
+                  <div className="absolute inset-x-0 top-10 flex justify-center opacity-60 pointer-events-none z-0">
+                    <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ring-red-200 uppercase tracking-wider">
+                      Feriado: {holiday.name}
+                    </span>
+                  </div>
+                )}
+                {vacation && !holiday && (
+                  <div className="absolute inset-x-0 top-10 flex justify-center opacity-60 pointer-events-none z-0">
+                    <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ring-orange-200 uppercase tracking-wider">
+                      Férias
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto space-y-2 hide-scrollbar pb-8 z-10 w-full mt-2">
                   {dayMeetings.map((mtg, mtgIdx) => (
                     <div 
                       key={`mtg-${mtg.id}-${mtgIdx}`} 

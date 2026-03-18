@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { type User, type UserRole } from "@/lib/data"
+import { HolidaysVacationsManager } from "@/components/holidays-vacations-manager"
 
 export default function ConfiguracaoPage() {
   const users = useProjectStore((state) => state.users)
@@ -324,6 +325,8 @@ export default function ConfiguracaoPage() {
           </CardContent>
         </Card>
       </div>
+
+      <HolidaysVacationsManager />
     </div>
   )
 }

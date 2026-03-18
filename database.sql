@@ -142,3 +142,25 @@ ALTER TABLE phases
 -- ─── Permitir Nulls nas Datas Planeadas das Tasks──────────
 ALTER TABLE tasks ALTER COLUMN planned_start_date DROP NOT NULL;
 ALTER TABLE tasks ALTER COLUMN planned_end_date DROP NOT NULL;
+
+-- TODO
+-- ─── Tabela HOLIDAYS (Feriados) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS holidays (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    date DATE NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE holidays DISABLE ROW LEVEL SECURITY;
+
+-- ─── Tabela VACATIONS (Férias) ───────────────────────────────
+CREATE TABLE IF NOT EXISTS vacations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    technician_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE vacations DISABLE ROW LEVEL SECURITY;

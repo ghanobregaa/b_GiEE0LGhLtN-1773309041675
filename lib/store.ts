@@ -13,6 +13,8 @@ import {
   type Meeting,
   type MeetingChecklistItem,
   type TimesheetEntry,
+  type Holiday,
+  type Vacation,
 } from "./data"
 
 import { getApiUrl } from "./api-config"
@@ -151,6 +153,19 @@ const meetingToApi = (m: Partial<Meeting>) => ({
   ...(m.checklist !== undefined && { checklist: m.checklist }),
 })
 
+const mapHoliday = (h: any): Holiday => ({
+  id: String(h.id),
+  date: h.date,
+  name: h.name,
+})
+
+const mapVacation = (v: any): Vacation => ({
+  id: String(v.id),
+  technicianId: String(v.technician_id),
+  startDate: v.start_date,
+  endDate: v.end_date,
+})
+
 // ─── STORE ────────────────────────────────────────────────────────────────────
 
 interface ProjectStore {
@@ -158,6 +173,8 @@ interface ProjectStore {
   tasks: Task[]
   users: User[]
   meetings: Meeting[]
+  holidays: Holiday[]
+  vacations: Vacation[]
   isLoading: boolean
   error: string | null
 
@@ -189,6 +206,14 @@ interface ProjectStore {
 
   recalculateProjectHours: (projectId: string) => Promise<void>
   recalculatePhaseHours: (phaseId: string) => Promise<void>
+
+  // Holiday actions
+  addHoliday: (holiday: Omit<Holiday, "id">) => Promise<string>
+  deleteHoliday: (id: string) => Promise<void>
+
+  // Vacation actions
+  addVacation: (vacation: Omit<Vacation, "id">) => Promise<string>
+  deleteVacation: (id: string) => Promise<void>
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -196,6 +221,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   tasks: [],
   users: [],
   meetings: [],
+  holidays: [],
+  vacations: [],
   isLoading: false,
   error: null,
 
@@ -204,11 +231,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   fetchData: async () => {
     set({ isLoading: true, error: null })
     try {
-      const [projectsRes, tasksRes, usersRes, meetingsRes] = await Promise.all([
+      const [projectsRes, tasksRes, usersRes, meetingsRes, holidaysRes, vacationsRes] = await Promise.all([
         fetch(`${API_URL}/projects`),
         fetch(`${API_URL}/tasks`),
         fetch(`${API_URL}/users`),
         fetch(`${API_URL}/meetings`),
+        fetch(`${API_URL}/holidays`),
+        fetch(`${API_URL}/vacations`),
       ])
 
       if (!projectsRes.ok || !tasksRes.ok || !usersRes.ok || !meetingsRes.ok) {
@@ -219,11 +248,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const rawTasks = await tasksRes.json()
       const rawUsers = await usersRes.json()
       const rawMeetings = await meetingsRes.json()
+      const rawHolidays = (await holidaysRes.json().catch(() => [])) || []
+      const rawVacations = (await vacationsRes.json().catch(() => [])) || []
 
       const mappedTasks: Task[] = rawTasks.map(mapTask)
       const mappedProjects: Project[] = rawProjects.map(mapProject)
       const mappedUsers: User[] = rawUsers.map(mapUser)
       const mappedMeetings: Meeting[] = rawMeetings.map(mapMeeting)
+      const mappedHolidays: Holiday[] = rawHolidays.map(mapHoliday)
+      const mappedVacations: Vacation[] = rawVacations.map(mapVacation)
 
       // Recalcula as horas reais de cada projecto com base nas suas tarefas e reuniões
       const projectsWithHours = mappedProjects.map((p) => {
@@ -245,6 +278,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         tasks: mappedTasks,
         users: mappedUsers,
         meetings: mappedMeetings,
+        holidays: mappedHolidays,
+        vacations: mappedVacations,
         isLoading: false,
       })
     } catch (err: any) {
@@ -695,10 +730,54 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }),
     })
   },
+
+  // ─── HOLIDAYS ───────────────────────────────────────────────────────────────
+
+  addHoliday: async (holiday) => {
+    const res = await fetch(`${API_URL}/holidays`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(holiday),
+    })
+    if (!res.ok) throw new Error("Erro ao criar feriado")
+    const newRaw = await res.json()
+    const newHoliday = mapHoliday(newRaw)
+    set((state) => ({ holidays: [...state.holidays, newHoliday] }))
+    return newHoliday.id
+  },
+
+  deleteHoliday: async (id) => {
+    await fetch(`${API_URL}/holidays/${id}`, { method: "DELETE" })
+    set((state) => ({ holidays: state.holidays.filter(h => h.id !== id) }))
+  },
+
+  // ─── VACATIONS ──────────────────────────────────────────────────────────────
+
+  addVacation: async (vacation) => {
+    const res = await fetch(`${API_URL}/vacations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        technician_id: vacation.technicianId,
+        start_date: vacation.startDate,
+        end_date: vacation.endDate,
+      }),
+    })
+    if (!res.ok) throw new Error("Erro ao adicionar férias")
+    const newRaw = await res.json()
+    const newVacation = mapVacation(newRaw)
+    set((state) => ({ vacations: [...state.vacations, newVacation] }))
+    return newVacation.id
+  },
+
+  deleteVacation: async (id) => {
+    await fetch(`${API_URL}/vacations/${id}`, { method: "DELETE" })
+    set((state) => ({ vacations: state.vacations.filter(v => v.id !== id) }))
+  },
 }))
 
 // Re-export types and helper functions
-export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User, Meeting, MeetingChecklistItem, TimesheetEntry }
+export type { Project, Task, Phase, ProjectStatus, TaskStatus, PhaseType, Company, User, Meeting, MeetingChecklistItem, TimesheetEntry, Holiday, Vacation }
 export {
   formatDate,
   getStatusColor,
