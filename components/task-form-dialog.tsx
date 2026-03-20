@@ -458,8 +458,9 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                   id="plannedHours"
                   type="number"
                   min="0"
+                  step="0.5"
                   value={formData.plannedHours || ""}
-                  onChange={(e) => setFormData({ ...formData, plannedHours: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, plannedHours: parseFloat(e.target.value) || 0 })}
                   placeholder="0"
                   required={formData.status !== "Pendente"}
                 />
@@ -542,8 +543,9 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                     id="actualHours"
                     type="number"
                     min="0"
+                    step="0.5"
                     value={formData.actualHours || ""}
-                    onChange={(e) => setFormData({ ...formData, actualHours: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, actualHours: parseFloat(e.target.value) || 0 })}
                     placeholder="0"
                   />
                 </div>
