@@ -203,7 +203,6 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
     formData.projectId &&
     formData.name &&
     formData.technicianId &&
-    formData.requester &&
     (formData.status === "Pendente" || 
       (formData.plannedStartDate && formData.plannedEndDate && formData.plannedHours > 0))
 
@@ -387,13 +386,12 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="requester">Requisitante</Label>
+              <Label htmlFor="requester">Requisitante (opcional)</Label>
               <Input
                 id="requester"
                 value={formData.requester}
                 onChange={(e) => setFormData({ ...formData, requester: e.target.value })}
                 placeholder="Ex: João Silva"
-                required
               />
             </div>
           </div>
