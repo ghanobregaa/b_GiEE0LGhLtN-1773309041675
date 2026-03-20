@@ -138,7 +138,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
       const numDays = dates.length
       const baseHours = Math.floor((total / numDays) * 2) / 2
       let remaining = total - (baseHours * numDays)
-      
+
       const entries = dates.map(date => ({ date, hours: baseHours }))
 
       let idx = 0
@@ -152,7 +152,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
     }
 
     let timesheetEntries: { date: string, hours: number }[] | undefined = undefined;
-    
+
     if (formData.hasActualDates && formData.actualStartDate && formData.actualEndDate && formData.actualHours > 0) {
       timesheetEntries = calculateDistributedEntries(formData.actualStartDate, formData.actualEndDate, formData.actualHours);
     } else if (!formData.hasActualDates) {
@@ -193,8 +193,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
 
   // Pending tasks for the selected project and technician
   const pendingTasks = tasks.filter(
-    (t) => 
-      t.projectId === formData.projectId && 
+    (t) =>
+      t.projectId === formData.projectId &&
       t.technicianId === formData.technicianId &&
       (t.status === "Pendente" || (!t.actualStartDate && !t.actualEndDate))
   )
@@ -203,7 +203,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
     formData.projectId &&
     formData.name &&
     formData.technicianId &&
-    (formData.status === "Pendente" || 
+    (formData.status === "Pendente" ||
       (formData.plannedStartDate && formData.plannedEndDate && formData.plannedHours > 0))
 
   return (
@@ -227,11 +227,11 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                 value={formData.projectId}
                 onValueChange={(value) => {
                   const project = projects.find(p => p.id === value);
-                  setFormData({ 
-                    ...formData, 
-                    projectId: value, 
+                  setFormData({
+                    ...formData,
+                    projectId: value,
                     phaseId: "",
-                    requester: project?.owner || formData.requester 
+                    requester: project?.owner || formData.requester
                   })
                 }}
               >
@@ -391,7 +391,7 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                 id="requester"
                 value={formData.requester}
                 onChange={(e) => setFormData({ ...formData, requester: e.target.value })}
-                placeholder="Ex: João Silva"
+                placeholder="Ex: Guilherme Nóbrega"
               />
             </div>
           </div>
@@ -524,8 +524,8 @@ export function TaskFormDialog({ open, onOpenChange, editTask, defaultProjectId,
                           const newStart = range?.from ? format(range.from, "yyyy-MM-dd") : ""
                           const newEnd = range?.to ? format(range.to, "yyyy-MM-dd") : ""
                           const hours = calculateBusinessHours(newStart, newEnd)
-                          setFormData({ 
-                            ...formData, 
+                          setFormData({
+                            ...formData,
                             actualStartDate: newStart,
                             actualEndDate: newEnd,
                             actualHours: hours > 0 ? hours : formData.actualHours
