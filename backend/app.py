@@ -10,9 +10,13 @@ from flask import send_file
 from datetime import datetime, date, timedelta
 import calendar
 from fpdf import FPDF
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg') # Non-interactive backend
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use('Agg') # Non-interactive backend
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
 
 load_dotenv()
 
@@ -277,38 +281,42 @@ def export_monthly_report():
                 status_counts[status] = status_counts.get(status, 0) + 1
 
         # 4. Gerar Gráficos
-        # Gráfico 1: Horas por Técnico
-        fig1, ax1 = plt.subplots(figsize=(6, 4))
-        if tech_hours:
-            names = list(tech_hours.keys())
-            hours = list(tech_hours.values())
-            ax1.bar(names, hours, color='#3b82f6')
-            ax1.set_title('Horas Reais por Técnico (Período)', fontsize=12, fontweight='bold', color='#1f2937')
-            ax1.set_ylabel('Horas')
-            plt.xticks(rotation=35, ha='right', fontsize=9)
-        else:
-            ax1.text(0.5, 0.5, 'Sem dados de horas', ha='center', va='center')
-        plt.tight_layout()
-        img_buf1 = io.BytesIO()
-        plt.savefig(img_buf1, format='png', dpi=150)
-        img_buf1.seek(0)
-        plt.close(fig1)
+        img_buf1 = None
+        img_buf2 = None
+        
+        if HAS_MATPLOTLIB:
+            # Gráfico 1: Horas por Técnico
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            if tech_hours:
+                names = list(tech_hours.keys())
+                hours = list(tech_hours.values())
+                ax1.bar(names, hours, color='#3b82f6')
+                ax1.set_title('Horas Reais por Técnico (Período)', fontsize=12, fontweight='bold', color='#1f2937')
+                ax1.set_ylabel('Horas')
+                plt.xticks(rotation=35, ha='right', fontsize=9)
+            else:
+                ax1.text(0.5, 0.5, 'Sem dados de horas', ha='center', va='center')
+            plt.tight_layout()
+            img_buf1 = io.BytesIO()
+            plt.savefig(img_buf1, format='png', dpi=150)
+            img_buf1.seek(0)
+            plt.close(fig1)
 
-        # Gráfico 2: Estado das Tarefas
-        fig2, ax2 = plt.subplots(figsize=(6, 4))
-        if status_counts:
-            labels = list(status_counts.keys())
-            values = list(status_counts.values())
-            colors = ['#94a3b8', '#f59e0b', '#10b981', '#ef4444']
-            ax2.pie(values, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors[:len(labels)], textprops={'fontsize': 9})
-            ax2.set_title('Distribuição de Estado das Tarefas', fontsize=12, fontweight='bold', color='#1f2937')
-        else:
-            ax2.text(0.5, 0.5, 'Sem tarefas no período', ha='center', va='center')
-        plt.tight_layout()
-        img_buf2 = io.BytesIO()
-        plt.savefig(img_buf2, format='png', dpi=150)
-        img_buf2.seek(0)
-        plt.close(fig2)
+            # Gráfico 2: Estado das Tarefas
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            if status_counts:
+                labels = list(status_counts.keys())
+                values = list(status_counts.values())
+                colors = ['#94a3b8', '#f59e0b', '#10b981', '#ef4444']
+                ax2.pie(values, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors[:len(labels)], textprops={'fontsize': 9})
+                ax2.set_title('Distribuição de Estado das Tarefas', fontsize=12, fontweight='bold', color='#1f2937')
+            else:
+                ax2.text(0.5, 0.5, 'Sem tarefas no período', ha='center', va='center')
+            plt.tight_layout()
+            img_buf2 = io.BytesIO()
+            plt.savefig(img_buf2, format='png', dpi=150)
+            img_buf2.seek(0)
+            plt.close(fig2)
 
         # 5. Gerar PDF com FPDF2
         from fpdf.enums import XPos, YPos

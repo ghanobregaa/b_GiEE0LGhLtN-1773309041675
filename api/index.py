@@ -7,6 +7,16 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import pandas as pd
 import io
 from flask import send_file
+from datetime import datetime, date, timedelta
+import calendar
+from fpdf import FPDF
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use('Agg') # Non-interactive backend
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
 
 load_dotenv()
 
@@ -84,6 +94,7 @@ def to_snake(data: dict) -> dict:
         "technician_id":    "technician_id",
         "technicianIds":    "technician_ids",
         "technician_ids":   "technician_ids",
+        "timesheetEntries": "timesheet_entries",
     }
     result = {}
     for k, v in data.items():
@@ -117,8 +128,8 @@ def create_project():
         if "company" not in payload: payload["company"] = "SAVOY"
         if "planned_hours" not in payload: payload["planned_hours"] = 0
         
-        # Ensure UUID fields are not empty strings
-        for field in ["owner"]: # owner is text but just in case
+        # Ensure UUID and Date fields are not empty strings
+        for field in ["owner", "planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
             if field in payload and not payload[field]:
                 payload[field] = None
 
@@ -148,6 +159,11 @@ def update_project(id):
         # Remove campos que não devem ser actualizados directamente
         payload.pop("id", None)
         payload.pop("phases", None)
+
+        # Ensure Date fields are not empty strings
+        for field in ["planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
 
         res = supabase.table("projects").update(payload).eq("id", id).execute()
         if res.data:
@@ -208,6 +224,241 @@ def export_projects_excel():
     except Exception as e:
         print(f"Erro na exportação: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/reports/monthly/export', methods=['GET'])
+def export_monthly_report():
+    try:
+        # 1. Calcular datas (suporte opcional para query params)
+        start_param = request.args.get('start')
+        end_param = request.args.get('end')
+        
+        if start_param and end_param:
+            start_date = start_param
+            end_date = end_param
+        else:
+            # Padrão: Mês passado
+            today = datetime.now()
+            first_day_current = today.replace(day=1)
+            last_day_prev = first_day_current - timedelta(days=1)
+            first_day_prev = last_day_prev.replace(day=1)
+            start_date = first_day_prev.strftime('%Y-%m-%d')
+            end_date = last_day_prev.strftime('%Y-%m-%d')
+
+        # 2. Buscar Dados
+        meetings_res = supabase.table("meetings").select("*, projects(name)").gte("date", start_date).lte("date", end_date).execute()
+        meetings = meetings_res.data or []
+        
+        # Filtramos tarefas pelo período
+        tasks_res = supabase.table("tasks").select("*, projects(name)").execute()
+        all_tasks = tasks_res.data or []
+        
+        projects_res = supabase.table("projects").select("*").execute()
+        projects = projects_res.data or []
+        
+        phases_res = supabase.table("phases").select("*").execute()
+        phases = phases_res.data or []
+
+        users_res = supabase.table("users").select("*").execute()
+        users_list = users_res.data or []
+
+        # 3. Preparar Dados para Gráficos
+        tech_hours = {}
+        for t in all_tasks:
+            t_start = t.get("actual_start_date") or t.get("planned_start_date")
+            t_end = t.get("actual_end_date") or t.get("planned_end_date")
+            if t_start and t_end and t_start <= end_date and t_end >= start_date:
+                tech_id = t.get("technician_id")
+                user = next((u for u in users_list if u["id"] == tech_id), None)
+                tech_name = user["name"] if user else (t.get("technician") or "Sem Técnico")
+                tech_hours[tech_name] = tech_hours.get(tech_name, 0) + (t.get("actual_hours", 0) or 0)
+        
+        status_counts = {}
+        for t in all_tasks:
+            t_start = t.get("actual_start_date") or t.get("planned_start_date")
+            t_end = t.get("actual_end_date") or t.get("planned_end_date")
+            if t_start and t_end and t_start <= end_date and t_end >= start_date:
+                status = t.get("status") or "Pendente"
+                status_counts[status] = status_counts.get(status, 0) + 1
+
+        # 4. Gerar Gráficos
+        img_buf1 = None
+        img_buf2 = None
+        
+        if HAS_MATPLOTLIB:
+            # Gráfico 1: Horas por Técnico
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            if tech_hours:
+                names = list(tech_hours.keys())
+                hours = list(tech_hours.values())
+                ax1.bar(names, hours, color='#3b82f6')
+                ax1.set_title('Horas Reais por Técnico (Período)', fontsize=12, fontweight='bold', color='#1f2937')
+                ax1.set_ylabel('Horas')
+                plt.xticks(rotation=35, ha='right', fontsize=9)
+            else:
+                ax1.text(0.5, 0.5, 'Sem dados de horas', ha='center', va='center')
+            plt.tight_layout()
+            img_buf1 = io.BytesIO()
+            plt.savefig(img_buf1, format='png', dpi=150)
+            img_buf1.seek(0)
+            plt.close(fig1)
+
+            # Gráfico 2: Estado das Tarefas
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            if status_counts:
+                labels = list(status_counts.keys())
+                values = list(status_counts.values())
+                colors = ['#94a3b8', '#f59e0b', '#10b981', '#ef4444']
+                ax2.pie(values, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors[:len(labels)], textprops={'fontsize': 9})
+                ax2.set_title('Distribuição de Estado das Tarefas', fontsize=12, fontweight='bold', color='#1f2937')
+            else:
+                ax2.text(0.5, 0.5, 'Sem tarefas no período', ha='center', va='center')
+            plt.tight_layout()
+            img_buf2 = io.BytesIO()
+            plt.savefig(img_buf2, format='png', dpi=150)
+            img_buf2.seek(0)
+            plt.close(fig2)
+
+        # 5. Gerar PDF com FPDF2
+        from fpdf.enums import XPos, YPos
+
+        class PDF(FPDF):
+            def header(self):
+                self.set_font('Helvetica', 'B', 16)
+                self.set_text_color(31, 41, 55) # Gray-800
+                self.cell(0, 10, 'Relatório Mensal de Desenvolvimentos', border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+                self.set_font('Helvetica', 'I', 10)
+                self.set_text_color(107, 114, 128) # Gray-500
+                self.cell(0, 5, f'Período: {start_date} a {end_date}', border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+                self.ln(10)
+
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('Helvetica', 'I', 8)
+                self.set_text_color(156, 163, 175) # Gray-400
+                self.cell(0, 10, f'Página {self.page_no()}', border=0, align='C')
+
+            def chapter_title(self, title):
+                self.set_font('Helvetica', 'B', 12)
+                self.set_fill_color(249, 250, 251) # Gray-50
+                self.set_text_color(31, 41, 55) # Gray-800
+                self.cell(0, 10, f" {title}", border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='L', fill=True)
+                self.ln(2)
+
+        pdf = PDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=20)
+
+        # ─── 1. KPIs VISUAIS ───
+        pdf.chapter_title("1. RESUMO VISUAL (KPIs)")
+        y_before = pdf.get_y()
+        pdf.image(img_buf1, x=10, y=y_before, w=90)
+        pdf.image(img_buf2, x=105, y=y_before, w=90)
+        pdf.set_y(y_before + 65)
+        pdf.ln(5)
+
+        # ─── 2. DETALHE POR PROJETO ───
+        pdf.chapter_title("2. DETALHAMENTO POR PROJETO")
+        
+        for p in projects:
+            p_id = p["id"]
+            p_tasks = [t for t in all_tasks if t["project_id"] == p_id]
+            
+            # Filtramos apenas tarefas que tiveram atividade no período (ou todas do projeto?)
+            # O utilizador pediu "tarefas dentro de cada projeto", provavelmente as relevantes ao relatório.
+            # Vamos mostrar tarefas que intersectam o período.
+            active_p_tasks = [t for t in p_tasks if (t.get("actual_start_date") or t.get("planned_start_date") or "") <= end_date and (t.get("actual_end_date") or t.get("planned_end_date") or "") >= start_date]
+            
+            if not active_p_tasks and p.get("status") == "Concluído":
+                continue # Pula projetos concluídos sem atividade no mês
+
+            # Cabeçalho do Projeto
+            pdf.set_font('Helvetica', 'B', 11)
+            pdf.set_fill_color(243, 244, 246) # Gray-100
+            pdf.set_text_color(31, 41, 55)
+            pdf.cell(0, 10, f" Projeto: {p.get('name', 'N/A')}", border='T', new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+            
+            # Stats do Projeto
+            pdf.set_font('Helvetica', '', 9)
+            pdf.set_text_color(75, 85, 99) # Gray-600
+            stats_text = f"Estado: {p.get('status')}  |  Horas Previstas: {p.get('planned_hours', 0)}h  |  Horas Reais (Mês): {sum(t.get('actual_hours', 0) or 0 for t in active_p_tasks)}h"
+            pdf.cell(0, 7, stats_text, border='B', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(2)
+
+            if active_p_tasks:
+                # Tabela de Tarefas
+                pdf.set_font('Helvetica', 'B', 8)
+                pdf.set_fill_color(237, 242, 247)
+                pdf.set_text_color(31, 41, 55)
+                # widths: Nome(80), Técnico(40), Estado(30), Início(20), Fim(20)
+                t_widths = [85, 45, 25, 18, 17]
+                t_headers = ["Tarefa", "Técnico", "Estado", "Início", "Fim"]
+                for i, h in enumerate(t_headers):
+                    pdf.cell(t_widths[i], 6, h, border=1, align='C', fill=True)
+                pdf.ln()
+                
+                pdf.set_font('Helvetica', '', 7)
+                fill = False
+                for t in active_p_tasks:
+                    tech_id = t.get("technician_id")
+                    user = next((u for u in users_list if u["id"] == tech_id), None)
+                    t_tech = user["name"] if user else (t.get("technician") or "N/A")
+                    
+                    pdf.set_fill_color(252, 253, 254) if fill else pdf.set_fill_color(255, 255, 255)
+                    pdf.cell(t_widths[0], 6, str(t.get("name") or "")[:55], border=1, fill=True)
+                    pdf.cell(t_widths[1], 6, str(t_tech)[:25], border=1, fill=True)
+                    pdf.cell(t_widths[2], 6, str(t.get("status") or ""), border=1, align='C', fill=True)
+                    pdf.cell(t_widths[3], 6, str(t.get("actual_start_date") or t.get("planned_start_date") or "")[-5:], border=1, align='C', fill=True)
+                    pdf.cell(t_widths[4], 6, str(t.get("actual_end_date") or t.get("planned_end_date") or "")[-5:], border=1, align='C', fill=True)
+                    pdf.ln()
+                    fill = not fill
+            else:
+                pdf.set_font('Helvetica', 'I', 8)
+                pdf.cell(0, 6, " Sem tarefas ativas no período.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            pdf.ln(5)
+
+        # ─── 3. REUNIÕES ───
+        if meetings:
+            pdf.add_page()
+            pdf.chapter_title("3. REUNIÕES DE ACOMPANHAMENTO")
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.set_fill_color(229, 231, 235)
+            widths_meet = [20, 55, 50, 10, 55]
+            headers_meet = ["Data", "Título", "Projeto", "Hrs", "Participantes"]
+            for i, h in enumerate(headers_meet):
+                pdf.cell(widths_meet[i], 8, h, border=1, align='C', fill=True)
+            pdf.ln()
+            
+            pdf.set_font('Helvetica', '', 8)
+            fill = False
+            for m in meetings:
+                p_name = (m.get("projects") or {}).get("name") or ""
+                pdf.set_fill_color(249, 250, 251) if fill else pdf.set_fill_color(255, 255, 255)
+                pdf.cell(widths_meet[0], 7, str(m.get("date") or ""), border=1, align='C', fill=True)
+                pdf.cell(widths_meet[1], 7, str(m.get("title") or "")[:32], border=1, fill=True)
+                pdf.cell(widths_meet[2], 7, str(p_name)[:28], border=1, fill=True)
+                pdf.cell(widths_meet[3], 7, str(m.get('duration_hours', 0)), border=1, align='C', fill=True)
+                pdf.cell(widths_meet[4], 7, str(m.get("attendees") or "")[:35], border=1, fill=True)
+                pdf.ln()
+                fill = not fill
+        
+        # 6. Finalizar
+        pdf_bytes = pdf.output()
+        output = io.BytesIO(pdf_bytes)
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"Relatorio_Mensal_{start_date}_a_{end_date}.pdf"
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Erro na exportação: {str(e)}"}), 500
+
+
 
 # ─── PHASES ───────────────────────────────────────────────────────────────────
 
@@ -279,8 +530,8 @@ def create_task():
         if "status" not in payload: payload["status"] = "Pendente"
         if "planned_hours" not in payload: payload["planned_hours"] = 0
 
-        # Ensure UUID fields are not empty strings
-        for field in ["project_id", "phase_id", "technician_id"]:
+        # Ensure UUID and Date fields are not empty strings
+        for field in ["project_id", "phase_id", "technician_id", "planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
             if field in payload and not payload[field]:
                 payload[field] = None
 
@@ -304,6 +555,12 @@ def update_task(id):
         data = request.json
         payload = to_snake(data)
         payload.pop("id", None)
+
+        # Ensure Date fields are not empty strings
+        for field in ["planned_start_date", "planned_end_date", "actual_start_date", "actual_end_date"]:
+            if field in payload and not payload[field]:
+                payload[field] = None
+
         res = supabase.table("tasks").update(payload).eq("id", id).execute()
         if res.data:
             return jsonify(res.data[0])
@@ -532,9 +789,6 @@ def delete_vacation(id):
         return '', 204
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
-# Vercel needs the app variable
-app = app
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
