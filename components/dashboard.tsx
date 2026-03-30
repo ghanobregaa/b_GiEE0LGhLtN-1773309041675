@@ -68,7 +68,11 @@ export function Dashboard() {
   const handleMonthlyExport = async () => {
     setIsExporting(true)
     try {
-      const response = await fetch(`${API_URL}/reports/monthly/export`)
+      const queryParams = new URLSearchParams()
+      if (dateRange.start) queryParams.append("start", dateRange.start)
+      if (dateRange.end) queryParams.append("end", dateRange.end)
+      
+      const response = await fetch(`${API_URL}/reports/monthly/export?${queryParams.toString()}`)
       if (!response.ok) throw new Error("Falha na exportação")
       
       const blob = await response.blob()
@@ -118,8 +122,8 @@ export function Dashboard() {
       })
 
       filteredTasks = tasks.filter((t) => {
-        const taskStart = new Date(t.plannedStartDate)
-        const taskEnd = new Date(t.plannedEndDate)
+        const taskStart = new Date(t.plannedStartDate || "")
+        const taskEnd = new Date(t.plannedEndDate || "")
 
         if (startDate && endDate) {
           return taskStart <= endDate && taskEnd >= startDate

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "backend": "cd backend && arch -arm64 ./venv/bin/python3 app.py",
+    "start-all": "npm run dev & npm run backend",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
