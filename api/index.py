@@ -318,130 +318,212 @@ def export_monthly_report():
             img_buf2.seek(0)
             plt.close(fig2)
 
-        # 5. Gerar PDF com FPDF2
+        # 5. Gerar PDF com FPDF2 (PORTRAIT)
         from fpdf.enums import XPos, YPos
 
         class PDF(FPDF):
             def header(self):
-                self.set_font('Helvetica', 'B', 16)
-                self.set_text_color(31, 41, 55) # Gray-800
-                self.cell(0, 10, 'Relatório Mensal de Desenvolvimentos', border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-                self.set_font('Helvetica', 'I', 10)
-                self.set_text_color(107, 114, 128) # Gray-500
-                self.cell(0, 5, f'Período: {start_date} a {end_date}', border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-                self.ln(10)
+                if self.page_no() == 1:
+                    self.set_font('Helvetica', 'B', 16)
+                    self.set_text_color(31, 41, 55)
+                    self.cell(0, 10, 'Relatório de Acompanhamento', border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='L')
+                    self.ln(2)
 
             def footer(self):
                 self.set_y(-15)
                 self.set_font('Helvetica', 'I', 8)
-                self.set_text_color(156, 163, 175) # Gray-400
+                self.set_text_color(156, 163, 175)
                 self.cell(0, 10, f'Página {self.page_no()}', border=0, align='C')
 
-            def chapter_title(self, title):
-                self.set_font('Helvetica', 'B', 12)
-                self.set_fill_color(249, 250, 251) # Gray-50
-                self.set_text_color(31, 41, 55) # Gray-800
-                self.cell(0, 10, f" {title}", border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='L', fill=True)
-                self.ln(2)
+            def status_badge(self, status, x, y):
+                old_x, old_y = self.get_x(), self.get_y()
+                colors = {
+                    "Concluído": (220, 252, 231, 21, 128, 61),
+                    "Em curso": (219, 234, 254, 30, 64, 175),
+                    "Atrasado": (254, 226, 226, 153, 27, 27),
+                    "Novo": (243, 244, 246, 75, 85, 99)
+                }
+                bg_r, bg_g, bg_b, txt_r, txt_g, txt_b = colors.get(status, colors["Novo"])
+                self.set_fill_color(bg_r, bg_g, bg_b)
+                self.set_text_color(txt_r, txt_g, txt_b)
+                self.set_font('Helvetica', 'B', 8)
+                w, h = 25, 6
+                self.rect(x - w, y, w, h, 'F')
+                self.set_xy(x - w, y)
+                self.cell(w, h, status, border=0, align='C')
+                self.set_xy(old_x, old_y)
 
-        pdf = PDF()
+            def hours_card(self, actual, planned, x, y):
+                old_x, old_y = self.get_x(), self.get_y()
+                width, height = 60, 25
+                self.set_draw_color(229, 231, 235)
+                self.set_fill_color(255, 255, 255)
+                self.rect(x, y, width, height, 'DF')
+                
+                self.set_xy(x + 4, y + 4)
+                self.set_font('Helvetica', '', 7)
+                self.set_text_color(107, 114, 128)
+                self.cell(0, 0, "Horas Totais")
+                
+                self.set_xy(x + 4, y + 10)
+                self.set_font('Helvetica', 'B', 10)
+                self.set_text_color(31, 41, 55)
+                self.cell(0, 0, f"{actual} / {planned}h")
+                
+                bar_width, bar_height = 52, 2.5
+                progress = min(1, actual / planned) if planned > 0 else 0
+                self.set_fill_color(243, 244, 246)
+                self.rect(x + 4, y + 14, bar_width, bar_height, 'F')
+                self.set_fill_color(16, 185, 129)
+                self.rect(x + 4, y + 14, bar_width * progress, bar_height, 'F')
+                
+            def fmt_date(self, date_str):
+                if not date_str or len(date_str) < 10: return "-"
+                try:
+                    # Assume yyyy-mm-dd
+                    y, m, d = date_str[:10].split("-")
+                    return f"{d}-{m}-{y}"
+                except:
+                    return date_str
+
+        pdf = PDF(orientation='P', unit='mm', format='A4')
         pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=20)
+        pdf.set_auto_page_break(auto=True, margin=15)
 
-        # ─── 1. KPIs VISUAIS ───
-        pdf.chapter_title("1. RESUMO VISUAL (KPIs)")
-        y_before = pdf.get_y()
-        pdf.image(img_buf1, x=10, y=y_before, w=90)
-        pdf.image(img_buf2, x=105, y=y_before, w=90)
-        pdf.set_y(y_before + 65)
-        pdf.ln(5)
-
-        # ─── 2. DETALHE POR PROJETO ───
-        pdf.chapter_title("2. DETALHAMENTO POR PROJETO")
-        
+        # Ordenar PROJETOS por horas reais usadas (DESC)
+        project_actual_hours = {}
         for p in projects:
             p_id = p["id"]
+            total = sum(t.get("actual_hours", 0) or 0 for t in all_tasks if t["project_id"] == p_id)
+            project_actual_hours[p_id] = total
+
+        sorted_projects = sorted(projects, key=lambda x: project_actual_hours.get(x["id"], 0), reverse=True)
+
+        for p in sorted_projects:
+            p_id = p["id"]
             p_tasks = [t for t in all_tasks if t["project_id"] == p_id]
+            p_phases = sorted([ph for ph in phases if ph["project_id"] == p_id], 
+                             key=lambda x: x.get("planned_start_date") or "")
             
-            # Filtramos apenas tarefas que tiveram atividade no período (ou todas do projeto?)
-            # O utilizador pediu "tarefas dentro de cada projeto", provavelmente as relevantes ao relatório.
-            # Vamos mostrar tarefas que intersectam o período.
-            active_p_tasks = [t for t in p_tasks if (t.get("actual_start_date") or t.get("planned_start_date") or "") <= end_date and (t.get("actual_end_date") or t.get("planned_end_date") or "") >= start_date]
-            
-            if not active_p_tasks and p.get("status") == "Concluído":
-                continue # Pula projetos concluídos sem atividade no mês
+            if p.get("status") == "Concluído" and not p_tasks:
+                continue
 
-            # Cabeçalho do Projeto
-            pdf.set_font('Helvetica', 'B', 11)
-            pdf.set_fill_color(243, 244, 246) # Gray-100
-            pdf.set_text_color(31, 41, 55)
-            pdf.cell(0, 10, f" Projeto: {p.get('name', 'N/A')}", border='T', new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+            # ─── HEADER DO PROJETO ───
+            curr_y = pdf.get_y()
+            if curr_y > 200: 
+                pdf.add_page()
+                curr_y = pdf.get_y()
             
-            # Stats do Projeto
+            # 1. Título do Projeto
+            pdf.set_font('Helvetica', 'B', 18)
+            pdf.set_text_color(17, 24, 39)
+            pdf.cell(140, 10, str(p.get('name', 'N/A'))[:60], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            # 2. Badge de Estado (Top Right)
+            pdf.status_badge(p.get("status", "Novo"), pdf.w - 15, curr_y + 2)
+            
+            # 3. Empresa / Cliente
+            pdf.set_font('Helvetica', 'B', 12)
+            pdf.set_text_color(75, 85, 99)
+            pdf.cell(140, 7, str(p.get('company', 'AFA')).upper(), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            # 4. Informações do Projeto
+            pdf.ln(1)
             pdf.set_font('Helvetica', '', 9)
-            pdf.set_text_color(75, 85, 99) # Gray-600
-            stats_text = f"Estado: {p.get('status')}  |  Horas Previstas: {p.get('planned_hours', 0)}h  |  Horas Reais (Mês): {sum(t.get('actual_hours', 0) or 0 for t in active_p_tasks)}h"
-            pdf.cell(0, 7, stats_text, border='B', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(2)
-
-            if active_p_tasks:
-                # Tabela de Tarefas
+            pdf.set_text_color(107, 114, 128)
+            pdf.cell(140, 5, f"Responsável: {p.get('owner', 'N/A')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            start_p = pdf.fmt_date(p.get('planned_start_date'))
+            end_p = pdf.fmt_date(p.get('planned_end_date'))
+            pdf.cell(140, 5, f"Datas: {start_p} a {end_p}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            # 5. Hours Card
+            total_planned = p.get("planned_hours", 0) or 0
+            total_actual = project_actual_hours.get(p_id, 0)
+            pdf.hours_card(total_actual, total_planned, pdf.w - 75, curr_y + 12)
+            
+            pdf.set_y(curr_y + 40)
+            
+            # Tabela Fases
+            pdf.set_font('Helvetica', 'B', 8)
+            pdf.set_text_color(31, 41, 55)
+            pdf.cell(0, 8, "  Fases do Projeto", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            
+            ws = [12, 45, 30, 28, 9, 28, 9, 19]
+            pdf.set_font('Helvetica', 'B', 6)
+            pdf.set_fill_color(243, 244, 246)
+            headers = ["Tipo", "Nome", "Técnico", "Previsto (Período)", "Hrs", "Real (Período)", "Hrs", "Estado"]
+            for i, h in enumerate(headers):
+                pdf.cell(ws[i], 6, h, border=1, align='C', fill=True)
+            pdf.ln()
+            
+            pdf.set_font('Helvetica', '', 6)
+            fill = False
+            for ph in p_phases:
+                type_colors = {"Requisitos": (59, 130, 246), "Desenvolvimento": (245, 158, 11), "Testes": (16, 185, 129)}
+                dot_color = type_colors.get(ph.get("type"), (156, 163, 175))
+                pdf.set_fill_color(252, 253, 254) if fill else pdf.set_fill_color(255, 255, 255)
+                
+                x, y = pdf.get_x(), pdf.get_y()
+                pdf.cell(ws[0], 7, "", border=1, fill=True)
+                pdf.set_fill_color(*dot_color); pdf.ellipse(x + 2, y + 2.5, 2, 2, 'F')
+                pdf.set_xy(x + ws[0], y)
+                pdf.cell(ws[1], 7, str(ph.get("name", ""))[:32], border=1, fill=True)
+                
+                t_names = []
+                for tid in (ph.get("technician_ids") or []):
+                    user = next((u for u in users_list if str(u["id"]) == str(tid)), None)
+                    if user and user.get("name"):
+                        t_names.append("".join(w[0].upper() for w in user["name"].split() if w))
+                pdf.cell(ws[2], 7, ", ".join(t_names), border=1, fill=True)
+                
+                # Períodos Formatados
+                p_s = pdf.fmt_date(ph.get('planned_start_date'))
+                p_e = pdf.fmt_date(ph.get('planned_end_date'))
+                pdf.cell(ws[3], 7, f"{p_s} / {p_e}", border=1, align='C', fill=True)
+                pdf.cell(ws[4], 7, str(ph.get("planned_hours") or 0), border=1, align='C', fill=True)
+                
+                r_s = pdf.fmt_date(ph.get('actual_start_date'))
+                r_e = pdf.fmt_date(ph.get('actual_end_date'))
+                pdf.cell(ws[5], 7, f"{r_s} / {r_e}", border=1, align='C', fill=True)
+                pdf.cell(ws[6], 7, str(ph.get("actual_hours") or 0), border=1, align='C', fill=True)
+                
+                ph_status = "Concluído" if ph.get("actual_end_date") else "Em curso"
+                pdf.cell(ws[7], 7, ph_status, border=1, align='C', fill=True)
+                pdf.ln()
+                fill = not fill
+                
+            pdf.ln(8)
+            
+            # ─── REUNIÕES DO PROJETO ───
+            p_meetings = sorted([m for m in meetings if str(m.get("project_id")) == str(p_id)], 
+                               key=lambda x: x.get("date") or "", reverse=True)
+            
+            if p_meetings:
+                if pdf.get_y() > 250: pdf.add_page()
                 pdf.set_font('Helvetica', 'B', 8)
-                pdf.set_fill_color(237, 242, 247)
                 pdf.set_text_color(31, 41, 55)
-                # widths: Nome(80), Técnico(40), Estado(30), Início(20), Fim(20)
-                t_widths = [85, 45, 25, 18, 17]
-                t_headers = ["Tarefa", "Técnico", "Estado", "Início", "Fim"]
-                for i, h in enumerate(t_headers):
-                    pdf.cell(t_widths[i], 6, h, border=1, align='C', fill=True)
+                pdf.cell(0, 8, "  Reuniões Realizadas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                
+                mws = [40, 40]
+                pdf.set_font('Helvetica', 'B', 7)
+                pdf.set_fill_color(243, 244, 246)
+                m_headers = ["Dia", "Duração (Horas)"]
+                for i, h in enumerate(m_headers):
+                    pdf.cell(mws[i], 6, h, border=1, align='C', fill=True)
                 pdf.ln()
                 
                 pdf.set_font('Helvetica', '', 7)
-                fill = False
-                for t in active_p_tasks:
-                    tech_id = t.get("technician_id")
-                    user = next((u for u in users_list if u["id"] == tech_id), None)
-                    t_tech = user["name"] if user else (t.get("technician") or "N/A")
-                    
-                    pdf.set_fill_color(252, 253, 254) if fill else pdf.set_fill_color(255, 255, 255)
-                    pdf.cell(t_widths[0], 6, str(t.get("name") or "")[:55], border=1, fill=True)
-                    pdf.cell(t_widths[1], 6, str(t_tech)[:25], border=1, fill=True)
-                    pdf.cell(t_widths[2], 6, str(t.get("status") or ""), border=1, align='C', fill=True)
-                    pdf.cell(t_widths[3], 6, str(t.get("actual_start_date") or t.get("planned_start_date") or "")[-5:], border=1, align='C', fill=True)
-                    pdf.cell(t_widths[4], 6, str(t.get("actual_end_date") or t.get("planned_end_date") or "")[-5:], border=1, align='C', fill=True)
+                for m in p_meetings:
+                    if pdf.get_y() > 275: pdf.add_page()
+                    pdf.cell(mws[0], 7, pdf.fmt_date(m.get("date")), border=1, align='C')
+                    pdf.cell(mws[1], 7, f"{m.get('duration_hours') or 0}h", border=1, align='C')
                     pdf.ln()
-                    fill = not fill
+                
+                pdf.ln(5)
             else:
-                pdf.set_font('Helvetica', 'I', 8)
-                pdf.cell(0, 6, " Sem tarefas ativas no período.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            
-            pdf.ln(5)
+                pdf.ln(3)
 
-        # ─── 3. REUNIÕES ───
-        if meetings:
-            pdf.add_page()
-            pdf.chapter_title("3. REUNIÕES DE ACOMPANHAMENTO")
-            pdf.set_font('Helvetica', 'B', 9)
-            pdf.set_fill_color(229, 231, 235)
-            widths_meet = [20, 55, 50, 10, 55]
-            headers_meet = ["Data", "Título", "Projeto", "Hrs", "Participantes"]
-            for i, h in enumerate(headers_meet):
-                pdf.cell(widths_meet[i], 8, h, border=1, align='C', fill=True)
-            pdf.ln()
-            
-            pdf.set_font('Helvetica', '', 8)
-            fill = False
-            for m in meetings:
-                p_name = (m.get("projects") or {}).get("name") or ""
-                pdf.set_fill_color(249, 250, 251) if fill else pdf.set_fill_color(255, 255, 255)
-                pdf.cell(widths_meet[0], 7, str(m.get("date") or ""), border=1, align='C', fill=True)
-                pdf.cell(widths_meet[1], 7, str(m.get("title") or "")[:32], border=1, fill=True)
-                pdf.cell(widths_meet[2], 7, str(p_name)[:28], border=1, fill=True)
-                pdf.cell(widths_meet[3], 7, str(m.get('duration_hours', 0)), border=1, align='C', fill=True)
-                pdf.cell(widths_meet[4], 7, str(m.get("attendees") or "")[:35], border=1, fill=True)
-                pdf.ln()
-                fill = not fill
-        
         # 6. Finalizar
         pdf_bytes = pdf.output()
         output = io.BytesIO(pdf_bytes)
@@ -451,12 +533,13 @@ def export_monthly_report():
             output,
             mimetype='application/pdf',
             as_attachment=True,
-            download_name=f"Relatorio_Mensal_{start_date}_a_{end_date}.pdf"
+            download_name=f"Report_AFA_{start_date}_a_{end_date}.pdf"
         )
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Erro na exportação: {str(e)}"}), 500
+
 
 
 
