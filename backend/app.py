@@ -255,6 +255,297 @@ def export_monthly_report():
             start_date = first_day_prev.strftime('%Y-%m-%d')
             end_date = last_day_prev.strftime('%Y-%m-%d')
 
+        # ─── Helper: clamp date to [start_date, end_date] ────────────────────
+        def clamp_date(d):
+            if not d: return None
+            return max(d[:10], start_date) if d[:10] < start_date else min(d[:10], end_date)
+
+        def task_in_period(t):
+            t_start = (t.get("actual_start_date") or t.get("planned_start_date") or "")[:10]
+            t_end   = (t.get("actual_end_date")   or t.get("planned_end_date")   or "")[:10]
+            return bool(t_start and t_end and t_start <= end_date and t_end >= start_date)
+
+        def phase_in_period(ph):
+            ph_start = (ph.get("planned_start_date") or "")[:10]
+            ph_end   = (ph.get("planned_end_date")   or "")[:10]
+            return bool(ph_start and ph_end and ph_start <= end_date and ph_end >= start_date)
+
+        # 2. Buscar Dados
+        meetings_res = supabase.table("meetings").select("*, projects(name)").gte("date", start_date).lte("date", end_date).execute()
+        meetings = meetings_res.data or []
+        
+        tasks_res    = supabase.table("tasks").select("*").execute()
+        all_tasks    = tasks_res.data or []
+
+        projects_res = supabase.table("projects").select("*").execute()
+        projects     = projects_res.data or []
+
+        phases_res   = supabase.table("phases").select("*").execute()
+        phases       = phases_res.data or []
+
+        users_res    = supabase.table("users").select("*").execute()
+        users_list   = users_res.data or []
+
+        # 3. Filtrar apenas o que cai no período escolhido
+        tasks_in_period  = [t  for t  in all_tasks if task_in_period(t)]
+        phases_in_period = [ph for ph in phases    if phase_in_period(ph)]
+
+        # IDs de projetos activos no período
+        active_ids = set()
+        for t  in tasks_in_period:  active_ids.add(t["project_id"])
+        for ph in phases_in_period: active_ids.add(ph["project_id"])
+        for m  in meetings:
+            if m.get("project_id"): active_ids.add(m["project_id"])
+
+        # Horas por projeto (só tarefas no período)
+        proj_actual  = {}
+        proj_planned = {}
+        for p in projects:
+            pid = p["id"]
+            pt  = [t for t in tasks_in_period if t["project_id"] == pid]
+            proj_actual[pid]  = sum(t.get("actual_hours",  0) or 0 for t in pt)
+            proj_planned[pid] = sum(t.get("planned_hours", 0) or 0 for t in pt)
+
+        # 4. Preparar dados para gráficos
+        tech_hours = {}
+        for t in tasks_in_period:
+            uid  = t.get("technician_id")
+            user = next((u for u in users_list if u["id"] == uid), None)
+            name = user["name"] if user else (t.get("technician") or "Sem Técnico")
+            tech_hours[name] = tech_hours.get(name, 0) + (t.get("actual_hours", 0) or 0)
+
+        status_counts = {}
+        for t in tasks_in_period:
+            s = t.get("status") or "Pendente"
+            status_counts[s] = status_counts.get(s, 0) + 1
+
+        # 5. Gráficos (matplotlib)
+        img_buf1 = img_buf2 = None
+        if HAS_MATPLOTLIB:
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            if tech_hours:
+                ax1.bar(list(tech_hours.keys()), list(tech_hours.values()), color='#3b82f6')
+                ax1.set_title('Horas Reais por Técnico (Período)', fontsize=12, fontweight='bold', color='#1f2937')
+                ax1.set_ylabel('Horas')
+                plt.xticks(rotation=35, ha='right', fontsize=9)
+            else:
+                ax1.text(0.5, 0.5, 'Sem dados de horas', ha='center', va='center')
+            plt.tight_layout()
+            img_buf1 = io.BytesIO(); plt.savefig(img_buf1, format='png', dpi=150); img_buf1.seek(0); plt.close(fig1)
+
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            if status_counts:
+                labels = list(status_counts.keys()); values = list(status_counts.values())
+                ax2.pie(values, labels=labels, autopct='%1.1f%%', startangle=140,
+                        colors=['#94a3b8','#f59e0b','#10b981','#ef4444'][:len(labels)],
+                        textprops={'fontsize': 9})
+                ax2.set_title('Distribuição de Estado das Tarefas', fontsize=12, fontweight='bold', color='#1f2937')
+            else:
+                ax2.text(0.5, 0.5, 'Sem tarefas no período', ha='center', va='center')
+            plt.tight_layout()
+            img_buf2 = io.BytesIO(); plt.savefig(img_buf2, format='png', dpi=150); img_buf2.seek(0); plt.close(fig2)
+
+        # 6. Gerar PDF
+        from fpdf.enums import XPos, YPos
+
+        class PDF(FPDF):
+            def header(self):
+                if self.page_no() == 1:
+                    self.set_font('Helvetica', 'B', 16)
+                    self.set_text_color(31, 41, 55)
+                    self.cell(0, 10, f'Relatório de Acompanhamento  ({start_date} → {end_date})',
+                              border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='L')
+                    self.ln(2)
+
+            def footer(self):
+                self.set_y(-15); self.set_font('Helvetica','I',8)
+                self.set_text_color(156,163,175)
+                self.cell(0,10,f'Página {self.page_no()}',border=0,align='C')
+
+            def status_badge(self, status, x, y):
+                ox, oy = self.get_x(), self.get_y()
+                COLS = {"Concluído":(220,252,231,21,128,61),"Em curso":(219,234,254,30,64,175),
+                        "Atrasado":(254,226,226,153,27,27),"Novo":(243,244,246,75,85,99)}
+                br,bg,bb,tr,tg,tb = COLS.get(status, COLS["Novo"])
+                self.set_fill_color(br,bg,bb); self.set_text_color(tr,tg,tb)
+                self.set_font('Helvetica','B',8); w,h = 25,6
+                self.rect(x-w,y,w,h,'F'); self.set_xy(x-w,y); self.cell(w,h,status,border=0,align='C')
+                self.set_xy(ox,oy)
+
+            def hours_card(self, actual, planned, x, y):
+                ox, oy = self.get_x(), self.get_y()
+                self.set_draw_color(229,231,235); self.set_fill_color(255,255,255)
+                self.rect(x,y,60,25,'DF')
+                self.set_xy(x+4,y+4); self.set_font('Helvetica','',7)
+                self.set_text_color(107,114,128); self.cell(0,0,"Horas no Período")
+                self.set_xy(x+4,y+10); self.set_font('Helvetica','B',10)
+                self.set_text_color(31,41,55); self.cell(0,0,f"{actual} / {planned}h")
+                prog = min(1, actual/planned) if planned > 0 else 0
+                self.set_fill_color(243,244,246); self.rect(x+4,y+14,52,2.5,'F')
+                self.set_fill_color(16,185,129); self.rect(x+4,y+14,52*prog,2.5,'F')
+                self.set_xy(ox,oy)
+
+            def fmt(self, d):
+                if not d or len(d) < 10: return "-"
+                try: yy,mm,dd = d[:10].split("-"); return f"{dd}-{mm}-{yy}"
+                except: return d
+
+        pdf = PDF(orientation='P', unit='mm', format='A4')
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+
+        active_projects = [p for p in projects if p["id"] in active_ids]
+        sorted_projects = sorted(active_projects, key=lambda p: proj_actual.get(p["id"], 0), reverse=True)
+
+        for p in sorted_projects:
+            pid    = p["id"]
+            p_tasks  = [t  for t  in tasks_in_period  if t["project_id"]  == pid]
+            p_phases = sorted([ph for ph in phases_in_period if ph["project_id"] == pid],
+                              key=lambda x: x.get("planned_start_date") or "")
+
+            if p.get("status") == "Concluído" and not p_tasks and not p_phases:
+                continue
+
+            curr_y = pdf.get_y()
+            if curr_y > 200: pdf.add_page(); curr_y = pdf.get_y()
+
+            # Título
+            pdf.set_font('Helvetica','B',18); pdf.set_text_color(17,24,39)
+            pdf.cell(140,10,str(p.get('name',''))[:60],new_x=XPos.LMARGIN,new_y=YPos.NEXT)
+            pdf.status_badge(p.get("status","Novo"), pdf.w-15, curr_y+2)
+
+            # Empresa
+            pdf.set_font('Helvetica','B',12); pdf.set_text_color(75,85,99)
+            pdf.cell(140,7,str(p.get('company','AFA')).upper(),new_x=XPos.LMARGIN,new_y=YPos.NEXT)
+
+            # Responsável + Datas no período
+            pdf.ln(1); pdf.set_font('Helvetica','',9); pdf.set_text_color(107,114,128)
+            pdf.cell(140,5,f"Responsável: {p.get('owner','N/A')}",new_x=XPos.LMARGIN,new_y=YPos.NEXT)
+
+            # Datas do projeto constrangidas ao intervalo
+            p_disp_start = max((p.get('planned_start_date') or start_date)[:10], start_date)
+            p_disp_end   = min((p.get('planned_end_date')   or end_date)[:10],   end_date)
+            pdf.cell(140,5,f"Período: {pdf.fmt(p_disp_start)} a {pdf.fmt(p_disp_end)}",
+                     new_x=XPos.LMARGIN,new_y=YPos.NEXT)
+
+            # Card horas (só do período)
+            pdf.hours_card(proj_actual.get(pid,0), proj_planned.get(pid,0), pdf.w-75, curr_y+12)
+            pdf.set_y(curr_y+40)
+
+            # ─── Tabela Fases ───
+            pdf.set_font('Helvetica','B',8); pdf.set_text_color(31,41,55)
+            pdf.cell(0,8,"  Fases do Projeto",new_x=XPos.LMARGIN,new_y=YPos.NEXT)
+            ws = [12,45,30,28,9,28,9,19]
+            pdf.set_font('Helvetica','B',6); pdf.set_fill_color(243,244,246)
+            for i,h in enumerate(["Tipo","Nome","Técnico","Previsto (Período)","Hrs","Real (Período)","Hrs","Estado"]):
+                pdf.cell(ws[i],6,h,border=1,align='C',fill=True)
+            pdf.ln()
+
+            pdf.set_font('Helvetica','',6); fill=False
+            for ph in p_phases:
+                TYPE_COLORS = {"Requisitos":(59,130,246),"Desenvolvimento":(245,158,11),"Testes":(16,185,129)}
+                dot_col = TYPE_COLORS.get(ph.get("type"),(156,163,175))
+                pdf.set_fill_color(252,253,254) if fill else pdf.set_fill_color(255,255,255)
+
+                x,y = pdf.get_x(), pdf.get_y()
+                pdf.cell(ws[0],7,"",border=1,fill=True)
+                pdf.set_fill_color(*dot_col); pdf.ellipse(x+2,y+2.5,2,2,'F')
+                pdf.set_xy(x+ws[0],y)
+                pdf.cell(ws[1],7,str(ph.get("name",""))[:32],border=1,fill=True)
+
+                # Técnicos
+                t_names=[]
+                for tid in (ph.get("technician_ids") or []):
+                    u=next((u for u in users_list if str(u["id"])==str(tid)),None)
+                    if u and u.get("name"):
+                        t_names.append("".join(w[0].upper() for w in u["name"].split() if w))
+                pdf.cell(ws[2],7,", ".join(t_names),border=1,fill=True)
+
+                # Datas previstas da fase constrangidas ao intervalo
+                ph_ps = max((ph.get('planned_start_date') or start_date)[:10], start_date)
+                ph_pe = min((ph.get('planned_end_date')   or end_date)[:10],   end_date)
+                pdf.cell(ws[3],7,f"{pdf.fmt(ph_ps)} / {pdf.fmt(ph_pe)}",border=1,align='C',fill=True)
+
+                # Horas previstas: soma das tarefas da fase no período; senão horas da própria fase
+                ph_tasks = [t for t in p_tasks if t.get("phase_id") == ph["id"]]
+                if ph_tasks:
+                    ph_planned = sum(t.get("planned_hours",0) or 0 for t in ph_tasks)
+                    ph_actual  = sum(t.get("actual_hours", 0) or 0 for t in ph_tasks)
+                else:
+                    # Sem tarefas ligadas: usar horas da fase directamente (já filtrada ao período)
+                    ph_planned = ph.get("planned_hours") or 0
+                    ph_actual  = ph.get("actual_hours")  or 0
+
+                pdf.cell(ws[4],7,str(ph_planned),border=1,align='C',fill=True)
+
+                # Datas reais da fase constrangidas ao intervalo
+                ph_as = ph.get('actual_start_date')
+                ph_ae = ph.get('actual_end_date')
+                if ph_as or ph_ae:
+                    disp_as = pdf.fmt(max(ph_as[:10], start_date)) if ph_as else "-"
+                    disp_ae = pdf.fmt(min(ph_ae[:10], end_date))   if ph_ae else "-"
+                    real_str = f"{disp_as} / {disp_ae}"
+                else:
+                    real_str = "-"
+                pdf.cell(ws[5],7,real_str,border=1,align='C',fill=True)
+                pdf.cell(ws[6],7,str(ph_actual),border=1,align='C',fill=True)
+
+                ph_status = "Concluído" if ph.get("actual_end_date") else "Em curso"
+                pdf.cell(ws[7],7,ph_status,border=1,align='C',fill=True)
+                pdf.ln(); fill = not fill
+
+            pdf.ln(8)
+
+            # ─── Reuniões do Projeto ───
+            p_meetings = sorted([m for m in meetings if str(m.get("project_id"))==str(pid)],
+                                key=lambda x: x.get("date") or "", reverse=True)
+            if p_meetings:
+                if pdf.get_y() > 250: pdf.add_page()
+                pdf.set_font('Helvetica','B',8); pdf.set_text_color(31,41,55)
+                pdf.cell(0,8,"  Reuniões Realizadas",new_x=XPos.LMARGIN,new_y=YPos.NEXT)
+                mws=[40,40]
+                pdf.set_font('Helvetica','B',7); pdf.set_fill_color(243,244,246)
+                for h in ["Dia","Duração (Horas)"]:
+                    pdf.cell(mws[0],6,h,border=1,align='C',fill=True)
+                pdf.ln()
+                pdf.set_font('Helvetica','',7)
+                for m in p_meetings:
+                    if pdf.get_y() > 275: pdf.add_page()
+                    pdf.cell(mws[0],7,pdf.fmt(m.get("date")),border=1,align='C')
+                    pdf.cell(mws[1],7,f"{m.get('duration_hours') or 0}h",border=1,align='C')
+                    pdf.ln()
+                pdf.ln(5)
+            else:
+                pdf.ln(3)
+
+        # Finalizar PDF
+        pdf_bytes = pdf.output()
+        output = io.BytesIO(pdf_bytes); output.seek(0)
+        return send_file(output, mimetype='application/pdf', as_attachment=True,
+                         download_name=f"Report_AFA_{start_date}_a_{end_date}.pdf")
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": f"Erro na exportação: {str(e)}"}), 500
+
+
+    try:
+        # 1. Calcular datas (suporte opcional para query params)
+        start_param = request.args.get('start')
+        end_param = request.args.get('end')
+        
+        if start_param and end_param:
+            start_date = start_param
+            end_date = end_param
+        else:
+            # Padrão: Mês passado
+            today = datetime.now()
+            first_day_current = today.replace(day=1)
+            last_day_prev = first_day_current - timedelta(days=1)
+            first_day_prev = last_day_prev.replace(day=1)
+            start_date = first_day_prev.strftime('%Y-%m-%d')
+            end_date = last_day_prev.strftime('%Y-%m-%d')
+
         # 2. Buscar Dados
         meetings_res = supabase.table("meetings").select("*, projects(name)").gte("date", start_date).lte("date", end_date).execute()
         meetings = meetings_res.data or []
