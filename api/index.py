@@ -1,3 +1,14 @@
+import hashlib
+try:
+    if not hasattr(hashlib, 'scrypt'):
+        from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+        def scrypt_fallback(password, *, salt, n, r, p, maxmem=0, dklen=64):
+            kdf = Scrypt(salt=salt, length=dklen, n=n, r=r, p=p)
+            return kdf.derive(password)
+        hashlib.scrypt = scrypt_fallback
+except ImportError:
+    pass
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os

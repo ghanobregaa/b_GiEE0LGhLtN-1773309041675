@@ -217,9 +217,6 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
             <div className="text-sm font-semibold">
               {project.actualStartDate ? formatDate(project.actualStartDate) : "-"}
             </div>
-            <div className="text-sm text-muted-foreground">
-              {project.actualEndDate ? formatDate(project.actualEndDate) : "-"}
-            </div>
           </CardContent>
         </Card>
 
@@ -229,18 +226,23 @@ export function ProjectDetail({ project }: ProjectDetailProps) {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">
-              {project.actualHours} / {project.plannedHours}h
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold leading-none">{project.actualHours}</span>
+                <span className="text-xs text-muted-foreground">h reais</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-px w-10 bg-border" />
+                <span className="text-xs text-muted-foreground">{project.plannedHours}h previstas</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="mt-2">
               <Progress 
                 value={progress} 
-                className="h-2 flex-1" 
+                className="h-1.5" 
                 indicatorClassName={project.status === "Concluído" ? "bg-emerald-500" : undefined}
               />
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {project.actualHours}h / {project.plannedHours}h
-              </span>
+              <span className="text-[11px] text-muted-foreground mt-0.5 block">{progress}% concluído</span>
             </div>
           </CardContent>
         </Card>

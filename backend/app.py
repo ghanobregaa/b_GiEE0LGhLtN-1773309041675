@@ -1,3 +1,14 @@
+import hashlib
+try:
+    if not hasattr(hashlib, 'scrypt'):
+        from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+        def scrypt_fallback(password, *, salt, n, r, p, maxmem=0, dklen=64):
+            kdf = Scrypt(salt=salt, length=dklen, n=n, r=r, p=p)
+            return kdf.derive(password)
+        hashlib.scrypt = scrypt_fallback
+except ImportError:
+    pass
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
@@ -262,23 +273,41 @@ def export_monthly_report():
         users_list = users_res.data or []
 
         # 3. Preparar Dados para Gráficos
-        tech_hours = {}
+        tasks_in_period = []
         for t in all_tasks:
             t_start = t.get("actual_start_date") or t.get("planned_start_date")
             t_end = t.get("actual_end_date") or t.get("planned_end_date")
             if t_start and t_end and t_start <= end_date and t_end >= start_date:
-                tech_id = t.get("technician_id")
-                user = next((u for u in users_list if u["id"] == tech_id), None)
-                tech_name = user["name"] if user else (t.get("technician") or "Sem Técnico")
-                tech_hours[tech_name] = tech_hours.get(tech_name, 0) + (t.get("actual_hours", 0) or 0)
+                tasks_in_period.append(t)
+
+        phases_in_period = []
+        for ph in phases:
+            ph_start = ph.get("planned_start_date")
+            ph_end = ph.get("planned_end_date")
+            if ph_start and ph_end and ph_start <= end_date and ph_end >= start_date:
+                phases_in_period.append(ph)
+
+        # Determinar projetos ativos (que têm tarefas, fases ou reuniões no período)
+        active_project_ids = set()
+        for t in tasks_in_period:
+            active_project_ids.add(t["project_id"])
+        for ph in phases_in_period:
+            active_project_ids.add(ph["project_id"])
+        for m in meetings:
+            if m.get("project_id"):
+                active_project_ids.add(m["project_id"])
+
+        tech_hours = {}
+        for t in tasks_in_period:
+            tech_id = t.get("technician_id")
+            user = next((u for u in users_list if u["id"] == tech_id), None)
+            tech_name = user["name"] if user else (t.get("technician") or "Sem Técnico")
+            tech_hours[tech_name] = tech_hours.get(tech_name, 0) + (t.get("actual_hours", 0) or 0)
         
         status_counts = {}
-        for t in all_tasks:
-            t_start = t.get("actual_start_date") or t.get("planned_start_date")
-            t_end = t.get("actual_end_date") or t.get("planned_end_date")
-            if t_start and t_end and t_start <= end_date and t_end >= start_date:
-                status = t.get("status") or "Pendente"
-                status_counts[status] = status_counts.get(status, 0) + 1
+        for t in tasks_in_period:
+            status = t.get("status") or "Pendente"
+            status_counts[status] = status_counts.get(status, 0) + 1
 
         # 4. Gerar Gráficos
         img_buf1 = None
@@ -390,19 +419,22 @@ def export_monthly_report():
         pdf.add_page()
         pdf.set_auto_page_break(auto=True, margin=15)
 
-        # Ordenar PROJETOS por horas reais usadas (DESC)
+        # Ordenar PROJETOS por horas reais usadas no período (DESC)
         project_actual_hours = {}
+        project_planned_hours = {}
         for p in projects:
             p_id = p["id"]
-            total = sum(t.get("actual_hours", 0) or 0 for t in all_tasks if t["project_id"] == p_id)
-            project_actual_hours[p_id] = total
+            p_tasks = [t for t in tasks_in_period if t["project_id"] == p_id]
+            project_actual_hours[p_id] = sum(t.get("actual_hours", 0) or 0 for t in p_tasks)
+            project_planned_hours[p_id] = sum(t.get("planned_hours", 0) or 0 for t in p_tasks)
 
-        sorted_projects = sorted(projects, key=lambda x: project_actual_hours.get(x["id"], 0), reverse=True)
+        active_projects = [p for p in projects if p["id"] in active_project_ids]
+        sorted_projects = sorted(active_projects, key=lambda x: project_actual_hours.get(x["id"], 0), reverse=True)
 
         for p in sorted_projects:
             p_id = p["id"]
-            p_tasks = [t for t in all_tasks if t["project_id"] == p_id]
-            p_phases = sorted([ph for ph in phases if ph["project_id"] == p_id], 
+            p_tasks = [t for t in tasks_in_period if t["project_id"] == p_id]
+            p_phases = sorted([ph for ph in phases_in_period if ph["project_id"] == p_id], 
                              key=lambda x: x.get("planned_start_date") or "")
             
             if p.get("status") == "Concluído" and not p_tasks:
@@ -433,12 +465,18 @@ def export_monthly_report():
             pdf.set_text_color(107, 114, 128)
             pdf.cell(140, 5, f"Responsável: {p.get('owner', 'N/A')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             
-            start_p = pdf.fmt_date(p.get('planned_start_date'))
-            end_p = pdf.fmt_date(p.get('planned_end_date'))
+            # Constrain project dates to selected interval
+            p_start = p.get('planned_start_date')
+            p_end = p.get('planned_end_date')
+            disp_start = max(p_start, start_date) if p_start else start_date
+            disp_end = min(p_end, end_date) if p_end else end_date
+            
+            start_p = pdf.fmt_date(disp_start)
+            end_p = pdf.fmt_date(disp_end)
             pdf.cell(140, 5, f"Datas: {start_p} a {end_p}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             
             # 5. Hours Card
-            total_planned = p.get("planned_hours", 0) or 0
+            total_planned = project_planned_hours.get(p_id, 0)
             total_actual = project_actual_hours.get(p_id, 0)
             pdf.hours_card(total_actual, total_planned, pdf.w - 75, curr_y + 12)
             
@@ -477,16 +515,38 @@ def export_monthly_report():
                         t_names.append("".join(w[0].upper() for w in user["name"].split() if w))
                 pdf.cell(ws[2], 7, ", ".join(t_names), border=1, fill=True)
                 
-                # Períodos Formatados
-                p_s = pdf.fmt_date(ph.get('planned_start_date'))
-                p_e = pdf.fmt_date(ph.get('planned_end_date'))
+                # Constrain phase dates to selected interval
+                ph_p_start = ph.get('planned_start_date')
+                ph_p_end = ph.get('planned_end_date')
+                disp_ph_p_start = max(ph_p_start, start_date) if ph_p_start else start_date
+                disp_ph_p_end = min(ph_p_end, end_date) if ph_p_end else end_date
+
+                p_s = pdf.fmt_date(disp_ph_p_start)
+                p_e = pdf.fmt_date(disp_ph_p_end)
                 pdf.cell(ws[3], 7, f"{p_s} / {p_e}", border=1, align='C', fill=True)
-                pdf.cell(ws[4], 7, str(ph.get("planned_hours") or 0), border=1, align='C', fill=True)
                 
-                r_s = pdf.fmt_date(ph.get('actual_start_date'))
-                r_e = pdf.fmt_date(ph.get('actual_end_date'))
-                pdf.cell(ws[5], 7, f"{r_s} / {r_e}", border=1, align='C', fill=True)
-                pdf.cell(ws[6], 7, str(ph.get("actual_hours") or 0), border=1, align='C', fill=True)
+                # Calcular horas previstas e reais da fase dentro do período
+                ph_tasks = [t for t in p_tasks if t.get("phase_id") == ph["id"]]
+                if ph_tasks:
+                    ph_planned = sum(t.get("planned_hours", 0) or 0 for t in ph_tasks)
+                    ph_actual = sum(t.get("actual_hours", 0) or 0 for t in ph_tasks)
+                else:
+                    ph_planned = ph.get("planned_hours") or 0
+                    ph_actual = ph.get("actual_hours") or 0
+
+                pdf.cell(ws[4], 7, str(ph_planned), border=1, align='C', fill=True)
+                
+                # Constrain phase actual dates to selected interval
+                ph_act_start = ph.get('actual_start_date')
+                ph_act_end = ph.get('actual_end_date')
+                disp_ph_act_start = max(ph_act_start, start_date) if ph_act_start else None
+                disp_ph_act_end = min(ph_act_end, end_date) if ph_act_end else None
+                
+                r_s = pdf.fmt_date(disp_ph_act_start) if disp_ph_act_start else "-"
+                r_e = pdf.fmt_date(disp_ph_act_end) if disp_ph_act_end else "-"
+                r_date_str = f"{r_s} / {r_e}" if (ph_act_start or ph_act_end) else "-"
+                pdf.cell(ws[5], 7, r_date_str, border=1, align='C', fill=True)
+                pdf.cell(ws[6], 7, str(ph_actual), border=1, align='C', fill=True)
                 
                 ph_status = "Concluído" if ph.get("actual_end_date") else "Em curso"
                 pdf.cell(ws[7], 7, ph_status, border=1, align='C', fill=True)
